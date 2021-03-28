@@ -181,19 +181,26 @@ CREATE TABLE Customers
     name 	text not null,
 	address text not null,
 	phone 	int not null,
-	email 	text not null
+	email 	text not null,
+
+    unique(name, address, phone, email)
 );
 
 -- TODO: Trigger - to enforce total participation, every customer have at least one card (on delete or update)
 CREATE TABLE Credit_cards
 (
-    card_number int primary key,
+    -- card_number can begin with 0
+    card_number text primary key,
     CVV 		int not null,
     expiry_date date not null,
     cust_id 	int not null references Customers,
-    from_date 	date not null,
+    from_date 	timestamp not null,
 
-    unique(cust_id, card_number)
+    unique(cust_id, card_number),
+    CONSTRAINT valid_card_number check (
+        (card_number ~ '^\d*$') and (length(card_number) between 8 and 19)
+    ),
+    CONSTRAINT vaild_cvv check (length(CVV::text) in (3, 4))
 );
 
 
@@ -220,7 +227,7 @@ CREATE TABLE Buys
 (
 	buy_date 					date not null,
     cust_id 					int,
-	card_number 				int,
+	card_number 				text,
     package_id 					int references Course_packages,
 	num_remaining_redemptions 	int not null,
 
@@ -244,11 +251,12 @@ CREATE TABLE Redeems
     foreign key (sid, launch_date, course_id) references Sessions,
     foreign key (buy_date, cust_id, package_id) references Buys
 );
+
 -- TODO: TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
 -- TODO: TRIGGER - course offering is said to be available if the number of registrations received is no more than its seating capacity; otherwise, we say that a course offering is fully booked
 CREATE TABLE Registers (
 	register_date 	date not null,
-	card_number 	int,
+	card_number 	text,
     cust_id 		int,
 
 	sid 			int,
