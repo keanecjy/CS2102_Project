@@ -130,8 +130,11 @@ CREATE TABLE Offerings
 	eid 						int not null references Administrators,
 
 	primary key (launch_date, course_id),
-    CONSTRAINT correct_date check (start_date <= end_date and
-        start_date >= registration_deadline + interval '10 days')
+    CONSTRAINT correct_date check (
+        start_date <= end_date and
+        start_date >= registration_deadline + interval '10 days' and 
+	    launch_date <= registration_deadline
+    )
 );
 
 -- TODO: Trigger - to enforce total participation, every Offerings has >= 1 Sessions
@@ -141,6 +144,9 @@ CREATE TABLE Offerings
 -- TODO: Trigger - each part-time instructor total hours per month <= 30
 -- TODO: Trigger - the assigned instructor must specialise in that course_area
 -- TODO: Trigger - update seating_capacity in Offerings to sum of seating capacities of sessions
+-- TODO: Trigger - Each room can be used to conduct at most one course session at any time
+-- TODO: Trigger - This constraint have to be in trigger as subquery not allowed in check 
+--  CONSTRAINT is_week_day check (select extract(dow from session_date) in (1,2,3,4,5))
 CREATE TABLE Sessions
 (
 	sid 			int,
@@ -238,7 +244,8 @@ CREATE TABLE Redeems
     foreign key (sid, launch_date, course_id) references Sessions,
     foreign key (buy_date, cust_id, package_id) references Buys
 );
-
+-- TODO: TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
+-- TODO: TRIGGER - course offering is said to be available if the number of registrations received is no more than its seating capacity; otherwise, we say that a course offering is fully booked
 CREATE TABLE Registers (
 	register_date 	date not null,
 	card_number 	int,
