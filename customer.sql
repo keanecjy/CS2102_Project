@@ -3,10 +3,7 @@
  * Recommend to combine the functions after everything is completed
  */
 
-
-DROP FUNCTION IF EXISTS add_customer(text, text, int, text, text, date, int);
-
-CREATE FUNCTION add_customer(name text, address text, phone int, email text, 
+CREATE OR REPLACE FUNCTION add_customer(name text, address text, phone int, email text, 
     card_number text, expiry_date date, CVV int)
 RETURNS text AS $$
 DECLARE
@@ -30,9 +27,7 @@ $$ language plpgsql;
 -----
 
 
-DROP FUNCTION IF EXISTS update_credit_card(int, text, date, int);
-
-CREATE FUNCTION update_credit_card(cid int, c_number text, expiry date, cvv int)
+CREATE OR REPLACE FUNCTION update_credit_card(cid int, c_number text, expiry date, cvv int)
 RETURNS text as $$
 BEGIN
     if (expiry < current_date) then
@@ -64,9 +59,7 @@ $$ language plpgsql;
 
 
 -- Helpful functions for getting active card easily
-DROP FUNCTION IF EXISTS get_active_card(int);
-
-CREATE FUNCTION get_active_card(cid int)
+CREATE OR REPALCE FUNCTION get_active_card(cid int)
 returns Credit_cards as $$
 DECLARE active_card Credit_cards;
 BEGIN    
