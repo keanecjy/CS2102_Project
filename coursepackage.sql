@@ -143,6 +143,6 @@ $$ language plpgsql;
 
 
 /**
- * get_my_course_package(): 
+ * TODO: get_my_course_package(): 
  *  - used when a customer requests to view his/her active/partially active course package
  */
