@@ -5,30 +5,32 @@
 
 /** 
  * add_customer(): used to add a new customer
- **/
+ */
 CREATE OR REPLACE FUNCTION add_customer(name text, address text, phone int, email text, 
     card_number text, expiry_date date, CVV text)
-RETURNS void AS $$
+RETURNS customers AS $$
 DECLARE
+    rec customers;
     cid int;
 BEGIN
     if (expiry_date < current_date) then
-        raise warning 'Aborted: Credit card expired --> %', expiry_date
+        raise exception 'Credit card expired --> %', expiry_date
             using hint = 'Please check your expiry date';
-        return;
+        return NULL;
     end if;
 
     select coalesce(max(cust_id), 0) + 1 into cid
     from customers;
 
     insert into Customers 
-    values (cid, name, address, phone, email);
-
+    values (cid, name, address, phone, email)
+    returning * into rec;
+    
     insert into Credit_cards 
     values (card_number, CVV, expiry_date, cid, now());
 
     raise info 'Successfully added customer id %', cid;
-    return;
+    return rec;
 END
 $$ language plpgsql;
 
@@ -39,19 +41,21 @@ $$ language plpgsql;
  * update_credit_card(): Used when a customer request to change credit card details
  *      1. Creates new credit card when a new card number is used
  *      2. Update card details if card number is the same
- **/
+ */
 CREATE OR REPLACE FUNCTION update_credit_card(cid int, c_number text, c_expiry date, c_cvv text)
-RETURNS void as $$
+RETURNS credit_cards as $$
+DECLARE
+    rec credit_cards;
 BEGIN
     if (c_expiry < current_date) then
-        raise warning 'Aborted: New credit card expired --> %', c_expiry
+        raise exception 'New credit card expired --> %', c_expiry
             using hint = 'Please check your expiry date';
-        return;
+        return NULL;
 
     elsif (not exists(select 1 from Customers where cust_id = cid)) then
-        raise warning 'Aborted: Nonexistent customer id --> %', cid
+        raise exception 'Non-existent customer id --> %', cid
             using hint = 'Please check customer ID or use add_customer to add';
-        return;
+        return NULL;
     end if;
 
     if (exists(select 1 from credit_cards where cust_id = cid and card_number = c_number)) then
@@ -60,17 +64,19 @@ BEGIN
         set from_date = now(), 
             expiry_date = c_expiry, 
             CVV = c_cvv
-        where cust_id = cid and card_number = c_number;
+        where cust_id = cid and card_number = c_number
+        returning * into rec;
 
         raise info 'Updated old credit card for customer %', cid;
     else 
         insert into Credit_cards 
-        values (c_number, c_cvv, c_expiry, cid, now());
+        values (c_number, c_cvv, c_expiry, cid, now())
+        returning * into rec;
 
         raise info 'Added new credit card for customer %', cid;
     end if;
 
-    return;
+    return rec;
 END
 $$ language plpgsql;
 
@@ -83,13 +89,14 @@ $$ language plpgsql;
  * get_active_card():
  * Helper function used internally to get the current active card of a customer.
  * Raises exception if the customer is invalid or the active card is expired.
- **/
+ */
 CREATE OR REPLACE FUNCTION get_active_card(cid int)
 returns Credit_cards as $$
-DECLARE active_card Credit_cards;
+DECLARE
+    active_card Credit_cards;
 BEGIN
     if not exists(select 1 from Customers where cust_id = cid) then
-        raise exception 'Invalid customer id --> %', cid;
+        raise exception 'Non-existent customer id --> %', cid;
         return NULL;
     end if;
 
@@ -107,7 +114,7 @@ BEGIN
     elsif (active_card.expiry_date < current_date) then
         raise exception 'Credit card for customer % expired', cid;
 
-        return active_card;
+        return NULL;
     end if;
 
     return active_card;
