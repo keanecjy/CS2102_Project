@@ -186,12 +186,11 @@ CREATE TABLE Customers
     unique(name, address, phone, email)
 );
 
--- TODO: Trigger - to enforce total participation, every customer have at least one card (on delete or update)
 CREATE TABLE Credit_cards
 (
-    -- card_number can begin with 0
+    -- card_number and cvv can begin with 0
     card_number text primary key,
-    CVV 		int not null,
+    CVV 		text not null,
     expiry_date date not null,
     cust_id 	int not null references Customers,
     from_date 	timestamp not null,
@@ -200,7 +199,7 @@ CREATE TABLE Credit_cards
     CONSTRAINT valid_card_number check (
         (card_number ~ '^\d*$') and (length(card_number) between 8 and 19)
     ),
-    CONSTRAINT vaild_cvv check (length(CVV::text) in (3, 4))
+    CONSTRAINT vaild_cvv check (length(CVV) in (3, 4))
 );
 
 
