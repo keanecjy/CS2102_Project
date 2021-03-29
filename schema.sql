@@ -147,7 +147,6 @@ CREATE TABLE Offerings
 -- TODO: Trigger - update seating_capacity in Offerings to sum of seating capacities of sessions
 -- TODO: Trigger - Each room can be used to conduct at most one course session at any time
 -- TODO: Trigger - This constraint have to be in trigger as subquery not allowed in check 
---  CONSTRAINT is_week_day check (select extract(dow from session_date) in (1,2,3,4,5))
 CREATE TABLE Sessions
 (
     sid 			int,
@@ -166,7 +165,9 @@ CREATE TABLE Sessions
 
     CONSTRAINT valid_hours check (start_time <= end_time),
     CONSTRAINT within_working_hours check (TIME '09:00' <= start_time and end_time <= TIME '18:00'),
-    CONSTRAINT not_within_lunch_hours check (NOT (start_time, end_time) OVERLAPS (TIME '12:00', TIME '14:00'))
+    CONSTRAINT not_within_lunch_hours check (NOT (start_time, end_time) OVERLAPS (TIME '12:00', TIME '14:00')),
+    CONSTRAINT unique_course_per_time_day unique (course_id, start_time, session_date),
+    CONSTRAINT is_week_day check (extract(dow from session_date) in (1,2,3,4,5))
 );
 
 
@@ -186,12 +187,11 @@ CREATE TABLE Customers
     unique(name, address, phone, email)
 );
 
--- TODO: Trigger - to enforce total participation, every customer have at least one card (on delete or update)
 CREATE TABLE Credit_cards
 (
-    -- card_number can begin with 0
+    -- card_number and cvv can begin with 0
     card_number text primary key,
-    CVV 		int not null,
+    CVV 		text not null,
     expiry_date date not null,
 
     cust_id 	int not null references Customers,
@@ -199,9 +199,8 @@ CREATE TABLE Credit_cards
 
     unique(cust_id, card_number),
     CONSTRAINT valid_card_number check (
-        (card_number ~ '^\d*$') and (length(card_number) between 8 and 19)
-    ),
-    CONSTRAINT vaild_cvv check (length(CVV::text) in (3, 4))
+        (card_number ~ '^\d*$') and (length(card_number) between 8 and 19)),
+    CONSTRAINT vaild_cvv check (length(CVV) in (3, 4))
 );
 
 
@@ -219,10 +218,11 @@ CREATE TABLE Course_packages
     sale_start_date 		date not null,
     sale_end_date 			date not null,
 
-    CONSTRAINT correct_dates check (sale_start_date <= sale_end_date)
+    CONSTRAINT correct_dates check (sale_start_date <= sale_end_date),
+    CONSTRAINT unique_packages unique(name, num_free_registrations, price,
+        sale_start_date, sale_end_date)
 );
 
--- TODO: TRIGGER - each customer can have at most one active or partially active package (trigger on add)
 -- NOTE: card_number not part of pri key
 CREATE TABLE Buys
 (
@@ -251,7 +251,9 @@ CREATE TABLE Redeems
 
     primary key (redeem_date, buy_date, cust_id, package_id, sid, launch_date, course_id),
     foreign key (buy_date, cust_id, package_id) references Buys,
-    foreign key (sid, launch_date, course_id) references Sessions
+    foreign key (sid, launch_date, course_id) references Sessions,
+
+    CONSTRAINT correct_dates check (buy_date <= redeem_date)
 );
 
 -- TODO: TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
