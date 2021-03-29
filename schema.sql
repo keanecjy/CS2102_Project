@@ -72,8 +72,8 @@ CREATE TABLE Pay_slips
     eid 			int references Employees on delete cascade,
     payment_date 	date,
     amount 			float not null check (amount >= 0),
-    num_work_hours  int not null check (num_work_hours >= 0),
-    num_work_days 	int not null check (num_work_days >= 0),
+    num_work_days 	int check (num_work_days >= 0),
+    num_work_hours  int check (num_work_hours >= 0),
 
     primary key (eid, payment_date)
 );
