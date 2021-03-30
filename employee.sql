@@ -10,10 +10,10 @@ DROP TRIGGER IF EXISTS employee_trigger ON Employees CASCADE;
 --
 -- This means that the user needs to accurately pass in the correct type of salary_info
 -- (monthly salary for full-time and hourly rate for part-time).
-CREATE OR REPLACE FUNCTION add_employee(name text, phone int, email text, address text,
+CREATE OR REPLACE PROCEDURE add_employee(name text, phone int, email text, address text,
     join_date date, salary_info float, employee_cat text,
     variadic course_areas text[] default null)
-RETURNS void AS $$
+AS $$
 DECLARE
     eid int;
     area_name text;
@@ -96,8 +96,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Checking if update operation on Employees is valid is done by employee_trigger.
-CREATE OR REPLACE FUNCTION remove_employee(eid int, depart_date date)
-RETURNS void AS $$
+CREATE OR REPLACE PROCEDURE remove_employee(eid int, depart_date date)
+AS $$
 BEGIN
     update Employees
     set depart_date = depart_date
