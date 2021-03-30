@@ -79,7 +79,7 @@ BEGIN
     end_hour := start_hour + concat(span, ' hours')::interval;
     max_hour := concat(30, ' hours')::interval;
     with
-        R0 as (SELECT Q0.eid, Q0.name
+        R0 as (SELECT DISTINCT Q0.eid, Q0.name
                FROM
                    ((SELECT * FROM Courses WHERE Courses.course_id = cid) AS TEMP1
                        NATURAL JOIN
@@ -87,7 +87,7 @@ BEGIN
                        NATURAL JOIN
                        Employees) AS Q0
         ),
-        R1 AS (SELECT Q1.eid, Q1.name
+        R1 AS (SELECT DISTINCT Q1.eid, Q1.name
                FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
                WHERE NOT EXISTS (
                        SELECT 1
@@ -100,7 +100,7 @@ BEGIN
                            )
                    )
         ),
-        R2 AS (SELECT Q2.eid, Q2.name
+        R2 AS (SELECT DISTINCT Q2.eid, Q2.name
                FROM (SELECT * FROM R0 NATURAL JOIN Full_time_instructors) AS Q2
                WHERE NOT EXISTS(
                        SELECT 1
@@ -130,7 +130,7 @@ BEGIN
     SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = cid;
     max_hour := concat(30, ' hours')::interval;
     with
-        R0 AS (SELECT Q0.eid, Q0.name
+        R0 AS (SELECT DISTINCT Q0.eid, Q0.name
                FROM
                    ((SELECT * FROM Courses WHERE Courses.course_id = cid) AS TEMP1
                        NATURAL JOIN
@@ -139,13 +139,13 @@ BEGIN
                        Employees) AS Q0
         ),
         R1 AS (SELECT s_day FROM generate_series(start_date, end_date, '1 day') AS S(s_day)),
-        R2 AS (SELECT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
+        R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
                FROM (R0 NATURAL JOIN Part_time_instructors CROSS JOIN R1) AS Q2
                WHERE (concat((SELECT get_hours(Q2.eid)), ' hours')) + span <= max_hour
                  AND (SELECT EXTRACT(dow FROM Q2.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q2.eid, span, Q2.s_day), 1)) <> 0
         ),
-        R3 AS (SELECT Q3.eid, Q3.name, (SELECT get_hours(Q3.eid)), Q3.s_day, (SELECT check_availability(Q3.eid, span, Q3.s_day))
+        R3 AS (SELECT DISTINCT Q3.eid, Q3.name, (SELECT get_hours(Q3.eid)), Q3.s_day, (SELECT check_availability(Q3.eid, span, Q3.s_day))
                FROM (R0 NATURAL JOIN Full_time_instructors CROSS JOIN R1) AS Q3
                WHERE (SELECT EXTRACT(dow FROM Q3.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q3.eid, span, Q3.s_day), 1)) <> 0
@@ -186,12 +186,10 @@ BEGIN
      * 3) Check whether if instructor is part-time or full-time instructor
      * 4) If part-time instructor, check that the sum of all his timing + new duration for this month <= 30
      */
--- (start_hour, start_hour + duration) OVERLAPS (S2.start_time, S2.end_time)))
     IF (current_date < session_date AND
-        1 = (SELECT 1 FROM Sessions S2 WHERE S2.eid = eid AND S2.course_id = cid AND S2.session_date = session_date
+        1 = (SELECT 1 FROM Sessions S2 WHERE S2.eid = eid AND S2.session_date = session_date
                                          AND NOT EXISTS (
-                    SELECT 1 FROM Sessions S3 WHERE S3.eid = S2.eid
-                                                AND S3.course_id = cid AND S3.session_date = session_date
+                    SELECT 1 FROM Sessions S3 WHERE S3.eid = S2.eid AND S3.session_date = session_date
                                                 AND (start_hour, start_hour + duration) OVERLAPS (S3.start_time - one_hour, S3.end_time + one_hour)))) THEN
         IF (1 = (SELECT 1 FROM Part_time_instructors PTI WHERE PTI.eid = eid)) THEN
             IF ((SELECT EXTRACT(HOUR FROM (SELECT SUM(end_time - start_time) FROM Sessions WHERE Sessions.eid = eid)))
@@ -211,9 +209,10 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER update_instructor_trigger on Sessions;
 
+-- this is to ensure that we only run this trigger when there is a change of instructor eid
 CREATE TRIGGER update_instructor_trigger
     BEFORE UPDATE ON Sessions
-    FOR EACH ROW EXECUTE FUNCTION update_instructor_trigger();
+    FOR EACH ROW WHEN (NEW.eid IS NOT NULL) EXECUTE FUNCTION update_instructor_trigger();
 
 -- Do I need to consider propagating?
 CREATE OR REPLACE PROCEDURE update_instructor(cid INT, sid INT, new_eid INT)
