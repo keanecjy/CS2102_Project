@@ -102,6 +102,7 @@ BEGIN
         end loop;
 
     end loop;
+    close curs;
 END;
 $$ LANGUAGE plpgsql;
 
