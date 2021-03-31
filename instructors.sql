@@ -5,18 +5,13 @@
 CREATE OR REPLACE FUNCTION check_availability(IN eid INT, IN span TIME, IN curr_date DATE)
     RETURNS TIME[] AS $$
 DECLARE
-    twelve_pm time;
-    two_pm time;
-    start_time time;
-    end_time time;
+    twelve_pm TIME := TIME '12:00';
+    two_pm TIME := TIME '14:00';
+    start_time TIME := TIME '09:00';
+    end_time TIME := TIME '18:00';
     arr Time[] := ARRAY[]::Time[];
-    one_hour time;
+    one_hour TIME:= concat(1, ' hours')::interval;
 BEGIN
-    one_hour := concat(1, ' hours')::interval;
-    twelve_pm := TIME '12:00';
-    two_pm := TIME '14:00';
-    start_time := TIME '09:00';
-    end_time := TIME '18:00';
     WHILE (start_time + span <= end_time) LOOP
             IF (1 == (SELECT 1 FROM Sessions S WHERE S.eid = eid AND S.session_date = curr_date
                                                  AND NOT (start_time, start_time + span) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
@@ -53,10 +48,10 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION find_instructors(IN cid int, IN session_date date, IN start_hour time)
     RETURNS TABLE (eid int, name text) AS $$
 DECLARE
-    span int;
+    span time;
     end_hour time;
-    max_hour time;
-    one_hour time;
+    max_hour time := concat(30, ' hours')::interval;
+    one_hour time := concat(1, ' hours')::interval;
 BEGIN
     -- validate session_date
     IF (SELECT EXTRACT(isodow FROM session_date) in (6, 7)) THEN
@@ -68,16 +63,15 @@ BEGIN
         RAISE EXCEPTION 'Cant a session before 9am';
     END IF;
 
-    SELECT duration INTO span FROM Courses WHERE Courses.course_id = cid;
+    SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = cid;
 
     -- validate session_date + duration
     IF ((start_hour, start_hour + span) OVERLAPS (TIME '12:00', TIME '14:00') OR (start_hour + span > TIME '18:00')) THEN
         RAISE EXCEPTION 'Invalid start time! It might have overlapped with lunch time or end work timing';
     END IF;
 
-    one_hour := concat(1, ' hours')::interval;
     end_hour := start_hour + concat(span, ' hours')::interval;
-    max_hour := concat(30, ' hours')::interval;
+
     with
         R0 as (SELECT DISTINCT Q0.eid, Q0.name
                FROM
@@ -164,19 +158,19 @@ $$ LANGUAGE plpgsql;
  * 3) If part-time instructor, check that the sum of all his timing + new duration for this month <= 30 (in instructors_part_time_duration_checks)
  * 4) Check if instructor specializes in that course (in instructors_specialization_checks)
  */
-CREATE OR REPLACE PROCEDURE update_instructor(cid INT, sid INT, new_eid INT)
+CREATE OR REPLACE PROCEDURE update_instructor(cid INT, date_of_launch DATE, sid INT, new_eid INT)
 AS $$
 DECLARE
     s_date date; -- session date
 BEGIN
-    SELECT S.session_date into s_date FROM Sessions S WHERE S.sid = sid;
-    IF (current_date < session_date) THEN
+    SELECT S.session_date into s_date FROM Sessions S WHERE S.sid = sid AND S.launch_date = date_of_launch AND S.cid = cid;
+    IF (current_date < s_date) THEN
         RAISE EXCEPTION 'This session has already passed';
     END IF;
 
     UPDATE Sessions
     SET eid = new_eid
-    WHERE eid = (SELECT S1.eid FROM Sessions S1 WHERE S1.course_id = cid AND S1.sid = sid);
+    WHERE eid = (SELECT S1.eid FROM Sessions S1 WHERE S1.course_id = cid AND S1.sid = sid AND S1.launch_date = date_of_launch);
 END;
 $$ LANGUAGE plpgsql;
 
