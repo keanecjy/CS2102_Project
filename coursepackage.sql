@@ -137,3 +137,52 @@ $$ language plpgsql;
 
 
 
+
+/**
+ * top_packages(): 
+ *  - used to find the top N course packages for this year.
+ */
+CREATE OR REPLACE FUNCTION top_packages(N int)
+RETURNS TABLE (
+    package_id int,
+    num_free_sessions int,
+    price float,
+    start_date date,
+    end_date date,
+    number_sold bigint
+) AS $$
+DECLARE
+    current_year double precision;
+BEGIN
+
+    if (N < 0) then
+        raise exception 'The given input N cannot be negative: %', N;
+    end if;
+
+    -- get current year
+    select date_part into current_year
+    from date_part('year', current_date);
+
+    return query 
+        with num_sales as (
+            select P.package_id, coalesce(count(buy_date), 0) as number_sold
+            from Course_packages P natural left join Buys B
+            where date_part('year', sale_start_date) = current_year
+            group by P.package_id
+        ), top_N_sale_count as (
+            select distinct S.number_sold
+            from num_sales S
+            order by number_sold desc
+            limit N
+        )
+        select 
+            P.package_id, 
+            P.num_free_registrations as num_free_sessions, 
+            P.price, 
+            P.sale_start_date as start_date, 
+            P.sale_end_date as end_date, 
+            T.number_sold
+        from Course_packages P natural join num_sales S natural join top_N_sale_count T
+        order by number_sold desc, price desc;
+END
+$$ language plpgsql;
