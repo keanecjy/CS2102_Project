@@ -22,21 +22,25 @@ CREATE TABLE Employees
     join_date 	date not null,
     depart_date date,
 
-    CONSTRAINT correct_dates check (join_date <= depart_date)
+    CONSTRAINT sequential_dates check (join_date <= depart_date)
 );
 
 -- TODO: Covering constraint: all part time employee must be part time instructors
 CREATE TABLE Part_time_emp
 (
     eid 		int primary key references Employees on delete cascade,
-    hourly_rate float not null check (hourly_rate >= 0)
+    hourly_rate float not null,
+
+    CONSTRAINT non_negative_rate check (hourly_rate >= 0)
 );
 
 -- TODO: Covering constraint: all full time employee must be either Full_time instructors or administrators or managers
 CREATE TABLE Full_time_emp
 (
     eid 			int primary key references Employees on delete cascade,
-    monthly_salary  float not null check (monthly_salary >= 0)
+    monthly_salary  float not null,
+
+    CONSTRAINT non_negative_salary check (monthly_salary >= 0)
 );
 
 -- TODO: Covering constraint: all instructors must be either part-time or full-time instructors
@@ -48,7 +52,7 @@ CREATE TABLE Instructors
 CREATE TABLE Part_time_instructors
 (
     eid int primary key references Instructors
-    references Part_time_emp on delete cascade
+        references Part_time_emp on delete cascade
 );
 
 CREATE TABLE Full_time_instructors
@@ -71,11 +75,18 @@ CREATE TABLE Pay_slips
 (
     eid 			int references Employees on delete cascade,
     payment_date 	date,
-    amount 			float not null check (amount >= 0),
-    num_work_days 	int check (num_work_days >= 0),
-    num_work_hours  int check (num_work_hours >= 0),
+    amount 			float not null,
+    num_work_days 	int,
+    num_work_hours  int,
 
-    primary key (eid, payment_date)
+    primary key (eid, payment_date),
+    CONSTRAINT non_negative_amount check (amount >= 0),
+    CONSTRAINT non_negative_work_days check (num_work_days >= 0),
+    CONSTRAINT non_negative_work_hours check (num_work_hours >= 0),
+    CONSTRAINT num_days_or_num_hours check (
+        (num_work_days is not null and num_work_hours is null) or
+        (num_work_days is null and num_work_hours is not null)
+    )
 );
 
 
@@ -88,7 +99,9 @@ CREATE TABLE Rooms
 (
     rid 			    int primary key,
     location 		    text not null,
-    seating_capacity    int not null check (seating_capacity >= 0)
+    seating_capacity    int not null,
+
+    CONSTRAINT positive_capacity check (seating_capacity > 0)
 );
 
 CREATE TABLE Course_areas
@@ -112,7 +125,9 @@ CREATE TABLE Courses
     title 		text unique not null,
     description text not null,
     area_name 	text not null references Course_areas,
-    duration 	int not null check (duration >= 0)
+    duration 	int not null,
+
+    CONSTRAINT positive_duration check (duration > 0)
 );
 
 CREATE TABLE Offerings
@@ -126,16 +141,18 @@ CREATE TABLE Offerings
 
     eid 						int not null references Administrators,
 
-    target_number_registrations int not null check (target_number_registrations >= 0),
+    target_number_registrations int not null,
     seating_capacity 			int default 0,
-    fees 						float not null check (fees >= 0),
+    fees 						float not null,
 
     primary key (launch_date, course_id),
-    CONSTRAINT correct_dates check (
+    CONSTRAINT correct_sequential_dates check (
         start_date <= end_date and
         start_date >= registration_deadline + interval '10 days' and 
         launch_date <= registration_deadline
-    )
+    ),
+    CONSTRAINT non_negative_target_registrations check (target_number_registrations >= 0),
+    CONSTRAINT non_negative_fees check (fees >= 0)
 );
 
 -- TODO: Trigger - to enforce total participation, every Offerings has >= 1 Sessions
@@ -195,7 +212,9 @@ CREATE TABLE Credit_cards
     expiry_date date not null,
 
     cust_id 	int not null references Customers,
-    from_date 	date not null,
+    -- timestamp is used as there a customer might update their credit card multiple time a day
+    -- Used to track the latest updated credit card
+    from_date 	timestamp not null,
 
     unique(cust_id, card_number),
     CONSTRAINT valid_card_number check (
@@ -213,27 +232,31 @@ CREATE TABLE Course_packages
 (
     package_id 				int primary key,
     name 					text not null,
-    num_free_registrations 	int not null check (num_free_registrations >= 0),
-    price 					float not null check (price >= 0),
+    num_free_registrations 	int not null,
+    price 					float not null,
     sale_start_date 		date not null,
     sale_end_date 			date not null,
 
     CONSTRAINT correct_dates check (sale_start_date <= sale_end_date),
-    CONSTRAINT unique_packages unique(name, num_free_registrations, price,
-        sale_start_date, sale_end_date)
+    CONSTRAINT unique_packages unique (name, num_free_registrations, price,
+        sale_start_date, sale_end_date),
+    CONSTRAINT positive_redemptions check (num_free_registrations > 0),
+    CONSTRAINT non_negative_price check (price >= 0)
 );
 
 -- NOTE: card_number not part of pri key
 CREATE TABLE Buys
 (
-    buy_date 					date not null,
+    buy_date 					date,
     cust_id 					int,
-    card_number 				text,
+    card_number 				text not null,
     package_id 					int references Course_packages,
-    num_remaining_redemptions   int not null check (num_remaining_redemptions >= 0),
+    num_remaining_redemptions   int not null,
 
     primary key (buy_date, cust_id, package_id),
-    foreign key (cust_id, card_number) references Credit_cards (cust_id, card_number)
+    foreign key (cust_id, card_number) references Credit_cards (cust_id, card_number),
+
+    CONSTRAINT non_negative_redemptions check (num_remaining_redemptions >= 0)
 );
 
 -- NOTE: card_number not included as an attribute
@@ -253,7 +276,7 @@ CREATE TABLE Redeems
     foreign key (buy_date, cust_id, package_id) references Buys,
     foreign key (sid, launch_date, course_id) references Sessions,
 
-    CONSTRAINT correct_dates check (buy_date <= redeem_date)
+    CONSTRAINT sequential_date check (buy_date <= redeem_date)
 );
 
 -- TODO: TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
@@ -271,7 +294,7 @@ CREATE TABLE Registers
     course_id 		int,
 
     primary key (register_date, cust_id, sid, launch_date, course_id),
-    foreign key (cust_id, card_number) references Credit_cards(cust_id, card_number),
+    foreign key (cust_id, card_number) references Credit_cards (cust_id, card_number),
     foreign key (sid, launch_date, course_id) references Sessions
 );
 
@@ -289,7 +312,7 @@ CREATE TABLE Cancels
 
     primary key (cancel_date, cust_id, sid, launch_date, course_id),
     foreign key (sid, launch_date, course_id) references Sessions,
-    CONSTRAINT refund_value check (
+    CONSTRAINT refund_package_or_money check (
         (refund_amt is not null and package_credit is null) or
         (refund_amt is null and package_credit is not null)
     )
