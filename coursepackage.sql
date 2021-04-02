@@ -5,22 +5,21 @@
 /** 
  * add_course_pacakage(): used to add a new course package
  */ 
-CREATE OR REPLACE FUNCTION add_course_package(name text, num_courses int, 
+CREATE OR REPLACE PROCEDURE add_course_package(name text, num_sessions int, 
     start_date date, end_date date, price float)
-RETURNS course_packages AS $$
+AS $$
 DECLARE
     pid int;
-    rec course_packages;
 BEGIN
+    -- generate id
     select coalesce(max(package_id), 0) + 1 into pid
     from course_packages;
 
+    -- insert into course packages
     insert into course_packages 
-    values (pid, name, num_courses, price, start_date, end_date)
-    returning * into rec;
+    values (pid, name, num_sessions, price, start_date, end_date);
 
     raise info 'Successfully added course package %', pid;
-    return rec;
 END
 $$ language plpgsql;
 
@@ -44,10 +43,9 @@ $$ language sql;
 /**
  * buy_course_package(): used when customer requests to purchase a course package
  */
-CREATE OR REPLACE FUNCTION buy_course_package(cid int, pid int)
-RETURNS buys AS $$
+CREATE OR REPLACE PROCEDURE buy_course_package(cid int, pid int)
+AS $$
 DECLARE
-    rec buys;
     active_card Credit_cards;
     n_redemptions int;
 BEGIN
@@ -55,12 +53,10 @@ BEGIN
     if (pid not in (select id from get_available_course_packages())) then
         raise exception 'Course package % is not available', pid
             using hint = 'Check for available courses using get_available_course_packages()';
-            
-        return NULL;
     end if;
 
-    select * into active_card 
-    from get_active_card(cid);
+    -- get required details
+    select * into active_card from get_active_card(cid);
     
     select num_free_registrations into n_redemptions
     from Course_packages C
@@ -69,13 +65,11 @@ BEGIN
     --  at_most_one_package trigger on Buys ensures at most one (partially) active package
     set constraints at_most_one_package immediate;
 
+    -- buying course package
     insert into Buys
-    values (current_date, cid, active_card.card_number, pid, n_redemptions)
-    returning * into rec;
+    values (current_date, cid, active_card.card_number, pid, n_redemptions);
     
     raise info 'Successfully bought course package % for customer %', pid, cid;
-
-    return rec;
 END
 $$ language plpgsql;
 
@@ -86,6 +80,8 @@ $$ language plpgsql;
  * get_my_course_package(): 
  *  - used when a customer requests to view his/her active/partially active course package
  */
+
+-- TODO: test with multiple redeemed sessions to check that the redeemed sessions is sorted in ascending order of session date and start hour
 CREATE OR REPLACE FUNCTION get_my_course_package(cid int)
 RETURNS json AS $$
 DECLARE
@@ -143,6 +139,50 @@ $$ language plpgsql;
 
 
 /**
- * TODO: get_my_course_package(): 
- *  - used when a customer requests to view his/her active/partially active course package
+ * top_packages(): 
+ *  - used to find the top N course packages for this year.
  */
+CREATE OR REPLACE FUNCTION top_packages(N int)
+RETURNS TABLE (
+    package_id int,
+    num_free_sessions int,
+    price float,
+    start_date date,
+    end_date date,
+    number_sold bigint
+) AS $$
+DECLARE
+    current_year double precision;
+BEGIN
+
+    if (N < 0) then
+        raise exception 'The given input N cannot be negative: %', N;
+    end if;
+
+    -- get current year
+    select date_part into current_year
+    from date_part('year', current_date);
+
+    return query 
+        with num_sales as (
+            select P.package_id, coalesce(count(buy_date), 0) as number_sold
+            from Course_packages P natural left join Buys B
+            where date_part('year', sale_start_date) = current_year
+            group by P.package_id
+        ), top_N_sale_count as (
+            select distinct S.number_sold
+            from num_sales S
+            order by number_sold desc
+            limit N
+        )
+        select 
+            P.package_id, 
+            P.num_free_registrations as num_free_sessions, 
+            P.price, 
+            P.sale_start_date as start_date, 
+            P.sale_end_date as end_date, 
+            T.number_sold
+        from Course_packages P natural join num_sales S natural join top_N_sale_count T
+        order by number_sold desc, price desc;
+END
+$$ language plpgsql;

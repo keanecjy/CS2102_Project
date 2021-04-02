@@ -1,5 +1,71 @@
+CREATE OR REPLACE FUNCTION view_summary_report(N int)
+RETURNS TABLE (month text, year int, total_salary_paid float,
+    total_sales_from_packages float, total_registration_fees float,
+    total_refunded_registration_fees float, total_redemption_count int) AS $$
+DECLARE
+    month_val int;
+    date_ptr date;
+BEGIN
+    if N < 0 then
+        raise exception 'Input to view summary report cannot be negative, provided value: %', N;
+    end if;
+
+    date_ptr := current_date;
+
+    loop
+        exit when N = 0;
+
+        month_val := extract (month from date_ptr);
+        month := to_char (date_ptr, 'Mon');
+        year := extract (year from date_ptr);
+
+        -- Get total salary paid
+        select coalesce(sum(amount), 0) into total_salary_paid
+        from Pay_slips
+        where extract (month from payment_date) = month_val and
+            extract (year from payment_date) = year;
+
+        -- Get total sales from course packages
+        select coalesce(sum(price), 0) into total_sales_from_packages
+        from Buys natural join Course_packages 
+        where extract (month from buy_date) = month_val and
+            extract (year from buy_date) = year;
+
+        -- Get total registration fees paid using credit card
+        -- TODO: Does total registration fees refer to actual money earned from reg fees or does it include refunded registration fees
+        select coalesce(sum(fees), 0) into total_registration_fees
+        from Registers natural join Offerings
+        where extract (month from register_date) = month_val and
+            extract (year from register_date) = year;
+
+        -- Get total amount of registration_fees refunded
+        select coalesce(sum(refund_amt), 0) into total_refunded_registration_fees
+        from Cancels
+        where extract (month from cancel_date) = month_val and
+            extract (year from cancel_date) = year;
+
+        -- Get total amount of redemptions
+        select coalesce(count(*), 0) into total_redemption_count
+        from Redeems
+        where extract (month from redeem_date) = month_val and
+            extract (year from redeem_date) = year;
+
+        -- iterate to previous month
+        date_ptr := date_ptr - interval '1 month';
+        N := N - 1;
+        
+        return next;
+
+    end loop;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+
+
 CREATE OR REPLACE FUNCTION view_manager_report()
-RETURNS TABLE(manager_name text, course_areas_total int, course_offerings_total int,
+RETURNS TABLE (manager_name text, course_areas_total int, course_offerings_total int,
     net_reg_fees_total float, top_course_title text[]) AS $$
 DECLARE
     curs cursor for (

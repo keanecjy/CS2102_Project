@@ -73,6 +73,8 @@ EXECUTE FUNCTION at_most_one_package();
 -- DROP TRIGGER new_session_timing_collision_checks ON Sessions;
 -- DROP TRIGGER course_offering_exists_checks ON Sessions;
 -- DROP TRIGGER delete_session_checks ON Sessions;
+-- DROP TRIGGER unique_session_per_course_redeem_checks on Redeems;
+-- DROP TRIGGER unique_session_per_course_register_checks on Registers;
 
 CREATE OR REPLACE FUNCTION instructors_specialization_checks()
     RETURNS TRIGGER AS $$
@@ -101,15 +103,15 @@ FOR EACH ROW EXECUTE FUNCTION instructors_specialization_checks();
 CREATE OR REPLACE FUNCTION instructors_part_time_duration_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    span TIME;
-    max_hour TIME := concat(30, ' hours')::interval;
+    span interval;
+    max_hour interval := concat(30, ' hours')::interval;
 BEGIN
-    SELECT DISTINCT duration INTO span
+    SELECT DISTINCT concat(duration, ' hours')::interval INTO span
     FROM Courses
     WHERE course_id = NEW.course_id;
 
     -- VALIDATE PART-TIME INSTRUCTOR
-    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((concat((SELECT get_hours(NEW.eid)), ' hours')) + span > max_hour)) THEN
+    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((concat((SELECT get_hours(NEW.eid)), ' hours')::interval) + span > max_hour)) THEN
         RAISE EXCEPTION 'This part-time instructor is going to be OVERWORKED if he take this session!';
         RETURN NULL;
     END IF;
@@ -126,7 +128,7 @@ FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
 CREATE OR REPLACE FUNCTION instructors_overlap_timing_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    one_hour time;
+    one_hour interval;
 BEGIN
     one_hour := concat(1, ' hours')::interval;
     -- VALIDATE AT MOST ONE COURSE SESSION AT ANY HOUR AND NOT TEACH 2 CONSECUTIVE SESSIONS
@@ -186,6 +188,7 @@ CREATE TRIGGER new_session_timing_collision_checks
 BEFORE INSERT OR UPDATE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION new_session_timing_collision_checks();
 
+-- I might delete this as this should be checked by the database via foreign key???
 CREATE OR REPLACE FUNCTION course_offering_exists_checks()
     RETURNS TRIGGER AS $$
 BEGIN
@@ -219,4 +222,43 @@ CREATE TRIGGER delete_session_checks
 BEFORE DELETE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION delete_session_checks();
 
+-- HELPER FUNCTION FOR THE TRIGGERS ONLY
+CREATE OR REPLACE FUNCTION is_not_unique_session_per_course(IN date_of_launch DATE, IN course_id INT, IN cus_id INT)
+    RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN (EXISTS (SELECT 1 FROM Registers R WHERE R.launch_date = date_of_launch AND R.course_id = course_id AND R.cust_id = cus_id)
+        OR
+            EXISTS (SELECT 1 FROM Redeems R WHERE R.launch_date = date_of_launch AND R.course_id = course_id AND R.cust_id = cus_id));
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION unique_session_per_course_register_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF ((SELECT is_not_unique_session_per_course(NEW.launch_date, NEW.course_id, NEW.cust_id))) THEN
+        RAISE EXCEPTION 'You already have a registered session for this course';
+        RETURN NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER unique_session_per_course_register_checks
+BEFORE INSERT ON Registers
+FOR EACH ROW EXECUTE FUNCTION unique_session_per_course_register_checks();
+
+CREATE OR REPLACE FUNCTION unique_session_per_course_redeem_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF ((SELECT is_not_unique_session_per_course(NEW.launch_date, NEW.course_id, NEW.cust_id))) THEN
+        RAISE EXCEPTION 'You already have a registered session for this course';
+        RETURN NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER unique_session_per_course_redeem_checks
+BEFORE INSERT ON Redeems
+FOR EACH ROW EXECUTE FUNCTION unique_session_per_course_redeem_checks();
 
