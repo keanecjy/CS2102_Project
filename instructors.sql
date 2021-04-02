@@ -74,12 +74,7 @@ BEGIN
 
     with
         R0 as (SELECT DISTINCT Q0.eid, Q0.name
-               FROM
-                   ((SELECT * FROM Courses WHERE Courses.course_id = cid) AS TEMP1
-                       NATURAL JOIN
-                       Specializes
-                       NATURAL JOIN
-                       Employees) AS Q0
+               FROM ((SELECT * FROM Courses WHERE Courses.course_id = cid) AS TEMP1 NATURAL JOIN Specializes) AS Q0
         ),
         R1 AS (SELECT DISTINCT Q1.eid, Q1.name
                FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
@@ -125,12 +120,7 @@ BEGIN
     max_hour := concat(30, ' hours')::interval;
     with
         R0 AS (SELECT DISTINCT Q0.eid, Q0.name
-               FROM
-                   ((SELECT * FROM Courses WHERE Courses.course_id = cid) AS TEMP1
-                       NATURAL JOIN
-                       Specializes
-                       NATURAL JOIN
-                       Employees) AS Q0
+               FROM ((SELECT * FROM Courses WHERE Courses.course_id = cid) AS TEMP1 NATURAL JOIN Specializes) AS Q0
         ),
         R1 AS (SELECT s_day FROM generate_series(start_date, end_date, '1 day') AS S(s_day)),
         R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))

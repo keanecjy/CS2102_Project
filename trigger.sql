@@ -73,6 +73,8 @@ EXECUTE FUNCTION at_most_one_package();
 -- DROP TRIGGER new_session_timing_collision_checks ON Sessions;
 -- DROP TRIGGER course_offering_exists_checks ON Sessions;
 -- DROP TRIGGER delete_session_checks ON Sessions;
+-- DROP TRIGGER unique_session_per_course_redeem_checks on Redeems;
+-- DROP TRIGGER unique_session_per_course_register_checks on Registers;
 
 CREATE OR REPLACE FUNCTION instructors_specialization_checks()
     RETURNS TRIGGER AS $$
@@ -220,4 +222,43 @@ CREATE TRIGGER delete_session_checks
 BEFORE DELETE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION delete_session_checks();
 
+-- HELPER FUNCTION FOR THE TRIGGERS ONLY
+CREATE OR REPLACE FUNCTION is_not_unique_session_per_course(IN date_of_launch DATE, IN course_id INT, IN cus_id INT)
+    RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN (EXISTS (SELECT 1 FROM Registers R WHERE R.launch_date = date_of_launch AND R.course_id = course_id AND R.cust_id = cus_id)
+        OR
+            EXISTS (SELECT 1 FROM Redeems R WHERE R.launch_date = date_of_launch AND R.course_id = course_id AND R.cust_id = cus_id));
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION unique_session_per_course_register_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF ((SELECT is_not_unique_session_per_course(NEW.launch_date, NEW.course_id, NEW.cust_id))) THEN
+        RAISE EXCEPTION 'You already have a registered session for this course';
+        RETURN NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER unique_session_per_course_register_checks
+BEFORE INSERT ON Registers
+FOR EACH ROW EXECUTE FUNCTION unique_session_per_course_register_checks();
+
+CREATE OR REPLACE FUNCTION unique_session_per_course_redeem_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF ((SELECT is_not_unique_session_per_course(NEW.launch_date, NEW.course_id, NEW.cust_id))) THEN
+        RAISE EXCEPTION 'You already have a registered session for this course';
+        RETURN NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER unique_session_per_course_redeem_checks
+BEFORE INSERT ON Redeems
+FOR EACH ROW EXECUTE FUNCTION unique_session_per_course_redeem_checks();
 
