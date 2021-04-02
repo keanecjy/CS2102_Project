@@ -28,15 +28,18 @@ $$ LANGUAGE plpgsql;
 
 
 -- Helper function to get the total number of hours that EID have work in that month
-CREATE OR REPLACE FUNCTION get_hours(IN eid INT)
+CREATE OR REPLACE FUNCTION get_hours(IN _eid INT)
     RETURNS INT AS $$
 DECLARE
     total_hour int;
 BEGIN
-    SELECT EXTRACT(HOUR FROM (SELECT SUM(end_time - start_time)
-                              FROM Sessions S where S.eid = eid
-                                                AND (SELECT EXTRACT (MONTH FROM S.session_date)) = (SELECT EXTRACT(MONTH FROM CURRENT_DATE)))
-               ) INTO total_hour;
+    SELECT COALESCE(EXTRACT(HOUR FROM (
+            SELECT SUM(end_time - start_time)
+            FROM Sessions S 
+            WHERE S.eid = _eid AND 
+            (SELECT EXTRACT (MONTH FROM S.session_date)) = (SELECT EXTRACT(MONTH FROM CURRENT_DATE))
+        )), 0) INTO total_hour;
+
     RETURN total_hour;
 END;
 $$ LANGUAGE plpgsql;

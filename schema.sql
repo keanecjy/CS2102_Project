@@ -105,6 +105,7 @@ CREATE TABLE Rooms
     CONSTRAINT positive_room_capacity check (seating_capacity > 0)
 );
 
+-- NOTE: eid is the id of the Managers
 CREATE TABLE Course_areas
 (
     area_name   text primary key,
@@ -131,6 +132,7 @@ CREATE TABLE Courses
     CONSTRAINT positive_course_duration check (duration > 0)
 );
 
+-- NOTE: eid refers to administrator of the course offering
 CREATE TABLE Offerings
 (
     launch_date 				date not null,
@@ -148,9 +150,12 @@ CREATE TABLE Offerings
 
     primary key (launch_date, course_id),
     CONSTRAINT correct_sequential_dates check (
-        start_date <= end_date and
-        start_date >= registration_deadline + interval '10 days' and 
-        launch_date <= registration_deadline
+        launch_date <= registration_deadline and
+        registration_deadline <= start_date and 
+        start_date <= end_date
+    ),
+    CONSTRAINT registration_deadline_10_days_before_start check (
+        registration_deadline + interval '10 days' <= start_date
     ),
     CONSTRAINT non_negative_target_registrations check (target_number_registrations >= 0),
     CONSTRAINT non_negative_fees check (fees >= 0)
@@ -164,7 +169,9 @@ CREATE TABLE Offerings
 -- TODO: Trigger - the assigned instructor must specialise in that course_area
 -- TODO: Trigger - update seating_capacity in Offerings to sum of seating capacities of sessions
 -- TODO: Trigger - Each room can be used to conduct at most one course session at any time
--- TODO: Trigger - This constraint have to be in trigger as subquery not allowed in check 
+-- TODO: Trigger - This constraint have to be in trigger as subquery not allowed in check
+--
+-- NOTE: eid refers to instructors of the session
 CREATE TABLE Sessions
 (
     sid 			int,
@@ -220,9 +227,8 @@ CREATE TABLE Credit_cards
     CONSTRAINT unique_card_number_per_customer unique(cust_id, card_number),
     CONSTRAINT valid_card_number check (
         (card_number ~ '^\d*$') and (length(card_number) between 8 and 19)),
-    CONSTRAINT vaild_cvv check (length(CVV) in (3, 4))
+    CONSTRAINT vaild_cvv check (CVV ~ '^\d{3}$')
 );
-
 
 
 /*******************************
