@@ -10,7 +10,7 @@ DECLARE
     start_time TIME := TIME '09:00';
     end_time TIME := TIME '18:00';
     arr Time[] := ARRAY[]::Time[];
-    one_hour TIME:= concat(1, ' hours')::interval;
+    one_hour interval := concat(1, ' hours')::interval;
 BEGIN
     WHILE (start_time + span <= end_time) LOOP
             IF (1 == (SELECT 1 FROM Sessions S WHERE S.eid = eid AND S.session_date = curr_date
@@ -48,10 +48,10 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION find_instructors(IN cid int, IN session_date date, IN start_hour time)
     RETURNS TABLE (eid int, name text) AS $$
 DECLARE
-    span time;
+    span interval;
     end_hour time;
-    max_hour time := concat(30, ' hours')::interval;
-    one_hour time := concat(1, ' hours')::interval;
+    max_hour interval := concat(30, ' hours')::interval;
+    one_hour interval := concat(1, ' hours')::interval;
 BEGIN
     -- validate session_date
     IF (SELECT EXTRACT(isodow FROM session_date) in (6, 7)) THEN
@@ -70,7 +70,7 @@ BEGIN
         RAISE EXCEPTION 'Invalid start time! It might have overlapped with lunch time or end work timing';
     END IF;
 
-    end_hour := start_hour + concat(span, ' hours')::interval;
+    end_hour := start_hour + span;
 
     with
         R0 as (SELECT DISTINCT Q0.eid, Q0.name
@@ -90,7 +90,7 @@ BEGIN
                          AND S1.eid = Q1.eid
                          AND ((start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
                            OR
-                              (concat((SELECT get_hours(Q1.eid)), ' hours')) + (end_hour - start_hour) > max_hour
+                              (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - start_hour) > max_hour
                            )
                    )
         ),
@@ -118,8 +118,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION get_available_instructors(IN cid INT, IN start_date date, IN end_date date)
     RETURNS TABLE (eid INT, name TEXT, hours INT, day date, available_hours Time[]) AS $$
 DECLARE
-    max_hour time;
-    span time;
+    max_hour interval;
+    span interval;
 BEGIN
     SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = cid;
     max_hour := concat(30, ' hours')::interval;
@@ -135,7 +135,7 @@ BEGIN
         R1 AS (SELECT s_day FROM generate_series(start_date, end_date, '1 day') AS S(s_day)),
         R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
                FROM (R0 NATURAL JOIN Part_time_instructors CROSS JOIN R1) AS Q2
-               WHERE (concat((SELECT get_hours(Q2.eid)), ' hours')) + span <= max_hour
+               WHERE (concat((SELECT get_hours(Q2.eid)), ' hours')::interval) + span <= max_hour
                  AND (SELECT EXTRACT(dow FROM Q2.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q2.eid, span, Q2.s_day), 1)) <> 0
         ),
@@ -173,7 +173,6 @@ BEGIN
     WHERE eid = (SELECT S1.eid FROM Sessions S1 WHERE S1.course_id = cid AND S1.sid = sid AND S1.launch_date = date_of_launch);
 END;
 $$ LANGUAGE plpgsql;
-
 
 	
 	

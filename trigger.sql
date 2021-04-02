@@ -101,15 +101,15 @@ FOR EACH ROW EXECUTE FUNCTION instructors_specialization_checks();
 CREATE OR REPLACE FUNCTION instructors_part_time_duration_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    span TIME;
-    max_hour TIME := concat(30, ' hours')::interval;
+    span interval;
+    max_hour interval := concat(30, ' hours')::interval;
 BEGIN
-    SELECT DISTINCT duration INTO span
+    SELECT DISTINCT concat(duration, ' hours')::interval INTO span
     FROM Courses
     WHERE course_id = NEW.course_id;
 
     -- VALIDATE PART-TIME INSTRUCTOR
-    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((concat((SELECT get_hours(NEW.eid)), ' hours')) + span > max_hour)) THEN
+    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((concat((SELECT get_hours(NEW.eid)), ' hours')::interval) + span > max_hour)) THEN
         RAISE EXCEPTION 'This part-time instructor is going to be OVERWORKED if he take this session!';
         RETURN NULL;
     END IF;
@@ -126,7 +126,7 @@ FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
 CREATE OR REPLACE FUNCTION instructors_overlap_timing_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    one_hour time;
+    one_hour interval;
 BEGIN
     one_hour := concat(1, ' hours')::interval;
     -- VALIDATE AT MOST ONE COURSE SESSION AT ANY HOUR AND NOT TEACH 2 CONSECUTIVE SESSIONS
@@ -186,6 +186,7 @@ CREATE TRIGGER new_session_timing_collision_checks
 BEFORE INSERT OR UPDATE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION new_session_timing_collision_checks();
 
+-- I might delete this as this should be checked by the database via foreign key???
 CREATE OR REPLACE FUNCTION course_offering_exists_checks()
     RETURNS TRIGGER AS $$
 BEGIN
