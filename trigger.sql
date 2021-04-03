@@ -35,14 +35,14 @@ DECLARE
     num_packages int;
 BEGIN
     WITH Redemption_CTE as (
-        SELECT * 
+        SELECT *
         FROM Redeems NATURAL JOIN Sessions
         WHERE cust_id = NEW.cust_id
     )
     SELECT COUNT(*) INTO num_packages
     FROM Buys B
     WHERE cust_id = NEW.cust_id AND
-        (num_remaining_redemptions > 0 OR 
+        (num_remaining_redemptions > 0 OR
             EXISTS(SELECT 1
                 FROM Redemption_CTE R
                 WHERE R.buy_date = B.buy_date AND
@@ -270,8 +270,8 @@ Trigger to check for inserting/updating a registration/redemption of session.
 3) Check if number of registration + redeems <= seating_capacity
 
 */
-create or replace function reg_redeem_check()
-    returns trigger as
+CREATE OR REPLACE FUNCTION reg_redeem_check()
+    RETURNS trigger AS
 $$
 DECLARE
     deadline date;
@@ -280,49 +280,50 @@ DECLARE
 
 BEGIN
 
-    select registration_deadline
-    into deadline
-    from Offerings
-    where launch_date = new.launch_date
-      and course_id = new.course_id;
+    SELECT registration_deadline
+    INTO deadline
+    FROM Offerings
+    WHERE launch_date = new.launch_date
+      AND course_id = new.course_id;
 
-    select seating_capacity, session_date
-    into seat_cap, s_date
-    from Sessions natural join Rooms
-    where new.sid = sid
-      and new.launch_date = launch_date
-      and new.course_id = course_id;
+    SELECT seating_capacity, session_date
+    INTO seat_cap, s_date
+    FROM Sessions
+             NATURAL JOIN Rooms
+    WHERE new.sid = sid
+      AND new.launch_date = launch_date
+      AND new.course_id = course_id;
 
     -- Check if current_date have already past the session_date or registration deadline
-    if (current_date > s_date or current_date > deadline) then
-        raise notice 'It is too late to register for this session!';
-        return null;
-    end if;
+    IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
+        RAISE NOTICE 'It is too late to register for this session!';
+        RETURN NULL;
+    END IF;
 
     -- Check if there is enough slots in the session
-    if (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) >= seat_cap) then
-        raise notice 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
-        return null;
-    end if;
+    IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) >= seat_cap) THEN
+        RAISE NOTICE 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
+        RETURN NULL;
+    END IF;
 
-    return new;
+    RETURN new;
 END;
 
-$$ language plpgsql;
+$$ LANGUAGE plpgsql;
 
 
-drop trigger if exists valid_session on Redeems;
-drop trigger if exists valid_session on Registers;
+DROP TRIGGER IF EXISTS valid_session ON Redeems;
+DROP TRIGGER IF EXISTS valid_session ON Registers;
 
-create trigger valid_session
-    before insert or update
-    on Redeems
-    for each row
-execute function reg_redeem_check();
+CREATE TRIGGER valid_session
+    BEFORE INSERT OR UPDATE
+    ON Redeems
+    FOR EACH ROW
+EXECUTE FUNCTION reg_redeem_check();
 
-create trigger valid_session
-    before insert or update
-    on Registers
-    for each row
-execute function reg_redeem_check();
+CREATE TRIGGER valid_session
+    BEFORE INSERT OR UPDATE
+    ON Registers
+    FOR EACH ROW
+EXECUTE FUNCTION reg_redeem_check();
 
