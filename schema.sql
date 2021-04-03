@@ -133,7 +133,6 @@ CREATE TABLE Courses
 );
 
 -- NOTE: eid refers to administrator of the course offering
--- TODO: Trigger - to enforce total participation, every Offerings has >= 1 Sessions
 CREATE TABLE Offerings
 (
     launch_date 				date not null,

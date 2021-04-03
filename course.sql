@@ -82,10 +82,6 @@ BEGIN
 
         END LOOP;
 
-    if (seat_capacity < target_num) then
-        raise exception 'Seat capacity must at least equal to the registrations.';
-    END IF;
-
     -- Update the course offerings record after all sessions are inserted
     UPDATE Offerings
     SET start_date                  = earliest_start_date,
