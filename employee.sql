@@ -1,5 +1,3 @@
-DROP TRIGGER IF EXISTS employee_trigger ON Employees CASCADE; 
-
 -- Whether an employee is full-time or part-time is decided by the employee_cat input.
 -- This will differentiate the salary_info input between monthly salary for a full-time
 -- and hourly rate for a part-time.
@@ -18,20 +16,29 @@ DECLARE
     _eid int;
     _area_name text;
 BEGIN
-    -- validate employee_cat
+    -- validate _employee_cat
     if _employee_cat not in ('Manager', 'Administrator', 'Part-time instructor',
         'Full-time instructor') then
         raise exception 'Employee category must be from the following set: {Manager, Administrator, Part-time instructor, Full-time instructor}.';
     end if;
 
-    -- validate course_areas
+    -- validate _course_areas
     if _employee_cat in ('Administrator') then
         if _course_areas is not null then
             raise exception 'The set of course areas must be empty for an administrator.';
         end if;
-    else -- manager / instructor
+    elseif _employee_cat in ('Manager') then
+        -- the set of course area can be empty as a manager can manage zero course area
+        foreach _area_name in array _course_areas
+        loop
+            -- the course area cannot be managed by another manager
+            if _area_name in (select area_name from Course_areas) then
+                raise exception '% is managed by another manager.', _area_name;
+            end if;
+        end loop;
+   else -- instructor
         if _course_areas is null then
-            raise exception 'The set of course areas cannot be empty for a manager or instructor.';
+            raise exception 'The set of course areas cannot be empty for an instructor.';
         end if;
     end if;
 
@@ -104,42 +111,6 @@ BEGIN
     where eid = _eid;
 END;
 $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION employee_trigger_func()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- condition 1
-    if new.eid in (select eid from Administrators)
-        and new.depart_date < any (
-            select registration_deadline
-            from Offerings
-            where eid = new.eid) then
-        raise notice 'Departure date for employee id % is not updated.', eid;
-        return null;
-    -- condition 2
-    elseif new.eid in (select eid from Instructors)
-        and new.depart_date < any (
-            select session_date
-            from Sessions
-            where eid = new.eid) then
-       raise notice 'Departure date for employee id % is not updated.', eid;
-       return null;
-    -- condition 3
-    elseif new.eid in (select eid from Managers)
-        and new.eid in (select eid from Course_areas) then
-        raise notice 'Departure date for employee id % is not updated.', eid;
-        return null;
-    else
-        return new;
-    end if;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER employee_trigger
-BEFORE UPDATE ON Employees
-FOR EACH ROW
-WHEN (new.depart_date is not null)
-EXECUTE FUNCTION employee_trigger_func();
 
 -- Number of work hours for a part-time instructor is computed based on the number of hours
 -- the part-time instructor taught at all sessions for that particular month and year.

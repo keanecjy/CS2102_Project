@@ -29,10 +29,10 @@ BEGIN
         -- assume start_time and end_time are in units of hour
         if not exists (
             select 1
-            from Sessions
+            from Sessions S
             where rid = r.rid
             and session_date = _session_date
-            and (r.start_time, r.end_time) overlaps (_session_start_time, _session_end_time)) then
+            and (start_time, end_time) overlaps (_session_start_time, _session_end_time)) then
             _rid := r.rid;
             return next;
         end if;
@@ -90,8 +90,9 @@ BEGIN
                         select 1
                         from Sessions
                         where rid = _rid
-                        and (_temp_start_hour, _temp_end_hour) overlaps (_start_time, _end_time)) then
-                        select array_append(_available_hours, _hour);
+                        and session_date = _loop_date
+                        and (_temp_start_hour, _temp_end_hour) overlaps (start_time, end_time)) then
+                        _available_hours := array_append(_available_hours, _hour);
                     end if;
                 end loop;
 
