@@ -1,5 +1,5 @@
--- assume session_start_hour and session_duration are in units of hour
-CREATE OR REPLACE FUNCTION find_rooms(_session_date date, _session_start_hour int,
+-- assume session_duration are in units of hour
+CREATE OR REPLACE FUNCTION find_rooms(_session_date date, _session_start_hour time,
     _session_duration int)
 RETURNS TABLE(_rid int) AS $$
 DECLARE
@@ -14,8 +14,8 @@ BEGIN
     end if;
 
     -- validate session_start_time and session_end_time
-    _session_start_time := make_time(_session_start_hour, 0, 0);
-    _session_end_time := make_time(_session_start_hour + _session_duration, 0, 0);
+    _session_start_time := _session_start_hour;
+    _session_end_time := _session_start_hour + concat(_session_duration, ' hours')::interval;
     if not (_session_start_time, _session_end_time) overlaps (time '09:00', time '18:00')
         or (_session_start_time, _session_end_time) overlaps (time '12:00', time '14:00') then
         raise exception 'Session start time and/or duration is/are invalid.';
@@ -29,7 +29,7 @@ BEGIN
         -- assume start_time and end_time are in units of hour
         if not exists (
             select 1
-            from Sessions S
+            from Sessions
             where rid = r.rid
             and session_date = _session_date
             and (start_time, end_time) overlaps (_session_start_time, _session_end_time)) then
@@ -51,7 +51,7 @@ $$ LANGUAGE plpgsql;
 --
 -- assume available_hours are in units of hours
 CREATE OR REPLACE FUNCTION get_available_rooms(_start_date date, _end_date date)
-RETURNS TABLE(_rid int, _room_capacity int, _day date, _available_hours int[]) AS $$
+RETURNS TABLE(_rid int, _room_capacity int, _day date, _available_hours time[]) AS $$
 DECLARE
     curs cursor for (select * from Rooms order by rid);
     r record;
@@ -61,7 +61,12 @@ DECLARE
     _temp_start_hour time;
     _temp_end_hour time;
 BEGIN
-    _hours_array := '{9, 10, 11, 14, 15, 16, 17}';
+    -- validate that _start_date is before _end_date
+    if (_start_date > _end_date) then
+        raise exception 'The start date cannot be after the end date.';
+    end if;
+
+    _hours_array := '{time 09:00, time 10:00, time 11:00, time 14:00, time 15:00, time 16:00, time 17:00}';
 
     open curs;
     -- loop each rid
@@ -83,21 +88,15 @@ BEGIN
                 -- loop each hour for the current rid and day
                 foreach _hour in array _hours_array
                 loop
-                    _temp_start_hour := make_time(_hour, 0, 0);
-                    _temp_end_hour := make_time(_hour + 1, 0, 0);
+                    _temp_start_hour := _hour;
+                    _temp_end_hour := _hour + interval '1 hour';
 
                     if not exists (
                         select 1
                         from Sessions
-<<<<<<< HEAD
                         where rid = _rid
                         and session_date = _loop_date
-                        and (_temp_start_hour, _temp_end_hour) overlaps (start_time, end_time)) then
-=======
-                        where rid = _rid and
-                            session_date = _loop_date and
-                            (_temp_start_hour, _temp_end_hour) overlaps (start_time, end_time)) then
->>>>>>> 26bcb00a8a22c65dfc1f5122d3e3b1437b46023b
+                        and (start_time, end_time) overlaps (_temp_start_hour, _temp_end_hour)) then
                         _available_hours := array_append(_available_hours, _hour);
                     end if;
                 end loop;
