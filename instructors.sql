@@ -116,11 +116,9 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION get_available_instructors(IN in_cid INT, IN in_start_date date, IN in_end_date date)
     RETURNS TABLE (eid INT, name TEXT, hours INT, day date, available_hours Time[]) AS $$
 DECLARE
-    max_hour interval;
     span int;
 BEGIN
     SELECT duration INTO span FROM Courses WHERE Courses.course_id = cid;
-    max_hour := concat(30, ' hours')::interval;
     with
         R0 AS (SELECT DISTINCT Q0.eid, Q0.name
                FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes) AS Q0
