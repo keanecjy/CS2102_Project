@@ -11,7 +11,7 @@ DECLARE
     end_time TIME := TIME '18:00';
     arr Time[] := ARRAY[]::Time[];
     one_hour interval := concat(1, ' hours')::interval;
-    span_interval : interval := concat(span, ' hours')::interval;
+    span_interval interval := concat(span, ' hours')::interval;
 BEGIN
     WHILE (start_time + span_interval <= end_time) LOOP
             IF (1 == (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
@@ -75,7 +75,6 @@ BEGIN
     END IF;
 
     end_hour := in_start_hour + span_interval;
-
     return query
         with
             R0 as (SELECT DISTINCT Q0.eid, Q0.name
@@ -86,10 +85,10 @@ BEGIN
                    WHERE NOT EXISTS (
                            SELECT 1
                            FROM Sessions S1
-                           WHERE S1.session_date = in_session_date
-                             AND S1.eid = Q1.eid
-                             AND ((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
-                               OR (SELECT get_hours(Q1.eid)) + span > 30)
+                           WHERE S1.eid = Q1.eid
+                             AND (((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour) AND 
+                                    S1.session_date = in_session_date)
+                                OR (SELECT get_hours(Q1.eid)) + span > 1)
                        )
             ),
             R2 AS (SELECT DISTINCT Q2.eid, Q2.name
