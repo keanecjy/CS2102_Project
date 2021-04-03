@@ -1,23 +1,23 @@
 -- assume session_start_hour and session_duration are in units of hour
-CREATE OR REPLACE FUNCTION find_rooms(session_date date, session_start_hour int,
-    session_duration int)
-RETURNS TABLE(rid int) AS $$
+CREATE OR REPLACE FUNCTION find_rooms(_session_date date, _session_start_hour int,
+    _session_duration int)
+RETURNS TABLE(_rid int) AS $$
 DECLARE
     curs cursor for (select * from Rooms order by rid);
     r record;
-    session_start_time time;
-    session_end_time time;
+    _session_start_time time;
+    _session_end_time time;
 BEGIN
     -- validate session_date
-    if (select extract(isodow from session_date) in (6, 7)) then
+    if (select extract(isodow from _session_date) in (6, 7)) then
         raise exception 'Session date must be a weekday.';
     end if;
 
     -- validate session_start_time and session_end_time
-    session_start_time := make_time(session_start_hour, 0, 0);
-    session_end_time := make_time(session_start_hour + session_duration, 0, 0);
-    if not (session_start_time, session_end_time) overlaps (time '09:00', time '18:00')
-        or (session_start_time, session_end_time) overlaps (time '12:00', time '14:00') then
+    _session_start_time := make_time(_session_start_hour, 0, 0);
+    _session_end_time := make_time(_session_start_hour + _session_duration, 0, 0);
+    if not (_session_start_time, _session_end_time) overlaps (time '09:00', time '18:00')
+        or (_session_start_time, _session_end_time) overlaps (time '12:00', time '14:00') then
         raise exception 'Session start time and/or duration is/are invalid.';
     end if;
 
@@ -31,9 +31,9 @@ BEGIN
             select 1
             from Sessions
             where rid = r.rid
-            and session_date = session_date
-            and (r.start_time, r.end_time) overlaps (session_start_time, session_end_time)) then
-            rid := r.rid;
+            and session_date = _session_date
+            and (r.start_time, r.end_time) overlaps (_session_start_time, _session_end_time)) then
+            _rid := r.rid;
             return next;
         end if;
     end loop;
@@ -50,18 +50,18 @@ $$ LANGUAGE plpgsql;
 -- hour value (e.g. 10 means 10:00 to 11:00)
 --
 -- assume available_hours are in units of hours
-CREATE OR REPLACE FUNCTION get_available_rooms(start_date date, end_date date)
-RETURNS TABLE(rid int, room_capacity int, day date, available_hours int[]) AS $$
+CREATE OR REPLACE FUNCTION get_available_rooms(_start_date date, _end_date date)
+RETURNS TABLE(_rid int, _room_capacity int, _day date, _available_hours int[]) AS $$
 DECLARE
     curs cursor for (select * from Rooms order by rid);
     r record;
-    hours_array int[];
-    hour int;
-    loop_date date;
-    temp_start_hour time;
-    temp_end_hour time;
+    _hours_array int[];
+    _hour int;
+    _loop_date date;
+    _temp_start_hour time;
+    _temp_end_hour time;
 BEGIN
-    hours_array := '{9, 10, 11, 14, 15, 16, 17}';
+    _hours_array := '{9, 10, 11, 14, 15, 16, 17}';
 
     open curs;
     -- loop each rid
@@ -70,35 +70,35 @@ BEGIN
         exit when not found;
         
         -- loop each day for the current rid
-        loop_date := start_date;
+        _loop_date := _start_date;
         loop
-            exit when loop_date > end_date;
+            exit when _loop_date > _end_date;
             
-            if (select extract(isodow from loop_date) in (1, 2, 3, 4, 5)) then
-                rid = r.rid;
-                room_capacity := r.seating_capacity;
-                day := loop_date;
-                available_hours := '{}';
+            if (select extract(isodow from _loop_date) in (1, 2, 3, 4, 5)) then
+                _rid = r.rid;
+                _room_capacity := r.seating_capacity;
+                _day := _loop_date;
+                _available_hours := '{}';
                 
                 -- loop each hour for the current rid and day
-                foreach hour in array hours_array
+                foreach _hour in array _hours_array
                 loop
-                    temp_start_hour := make_time(hour, 0, 0);
-                    temp_end_hour := make_time(hour + 1, 0, 0);
+                    _temp_start_hour := make_time(_hour, 0, 0);
+                    _temp_end_hour := make_time(_hour + 1, 0, 0);
 
                     if not exists (
                         select 1
                         from Sessions
-                        where rid = rid
-                        and (temp_start_hour, temp_end_hour) overlaps (start_time, end_time)) then
-                        select array_append(available_hours, hour);
+                        where rid = _rid
+                        and (_temp_start_hour, _temp_end_hour) overlaps (_start_time, _end_time)) then
+                        select array_append(_available_hours, _hour);
                     end if;
                 end loop;
 
                 return next;
             end if;
 
-            loop_date := loop_date + 1;
+            _loop_date := _loop_date + 1;
         end loop;
 
     end loop;
@@ -109,55 +109,55 @@ $$ LANGUAGE plpgsql;
 -- launch_date is needed to differentiate between two sessions with the same
 -- course id and same session number but offered at different times of the year
 -- (i.e. different launch_date)
-CREATE OR REPLACE PROCEDURE update_room(cid int, launch_date date, session_num int, new_rid int)
+CREATE OR REPLACE PROCEDURE update_room(_cid int, _launch_date date, _session_num int, _new_rid int)
 AS $$
 DECLARE
-    session_date date;
-    session_time time;
-    new_room_capacity int;
-    num_of_redeem int;
-    num_of_register int;
-    num_of_cancel int;
+    _session_date date;
+    _session_time time;
+    _new_room_capacity int;
+    _num_of_redeem int;
+    _num_of_register int;
+    _num_of_cancel int;
 BEGIN
     -- check that session has not started yet
-    select session_date, start_time into session_date, session_time
+    select session_date, start_time into _session_date, _session_time
     from Sessions
-    where course_id = cid and launch_date = launch_date and sid = session_num;
+    where course_id = _cid and launch_date = _launch_date and sid = _session_num;
 
-    if session_date < current_date
-        or (session_date = current_date and session_time <= current_time) then
+    if _session_date < current_date
+        or (_session_date = current_date and _session_time <= _current_time) then
         raise exception 'Room is not updated as the session has already started.';
     end if;
 
     -- check if new_rid exists in Rooms
-    if new_rid not in (select rid from Rooms) then
+    if _new_rid not in (select rid from Rooms) then
         raise exception 'The new room does not exist in the Rooms table.';
     end if;
 
     -- check if number of registrations exceed seating capacity of new room
-    select seating_capacity into new_room_capacity
+    select seating_capacity into _new_room_capacity
     from Rooms
-    where rid = new_rid;
+    where rid = _new_rid;
 
-    select count(cust_id) into num_of_redeem
+    select count(cust_id) into _num_of_redeem
     from Redeems
-    where course_id = cid and launch_date = launch_date and sid = session_num;
+    where course_id = _cid and launch_date = _launch_date and sid = _session_num;
 
-    select count(cust_id) into num_of_register
+    select count(cust_id) into _num_of_register
     from Registers
-    where course_id = cid and launch_date = launch_date and sid = session_num;
+    where course_id = _cid and launch_date = _launch_date and sid = _session_num;
 
-    select count(cust_id) into num_of_cancel
+    select count(cust_id) into _num_of_cancel
     from Cancels
-    where course_id = cid and launch_date = launch_date and sid = session_num;
+    where course_id = _cid and launch_date = _launch_date and sid = _session_num;
 
-    if new_room_capacity < (num_of_redeem + num_of_register - num_of_cancel) then
+    if _new_room_capacity < (_num_of_redeem + _num_of_register - _num_of_cancel) then
         raise exception 'The number of registrations exceeds the seating capacity of the new room.';
     end if;
 
     -- update room for the session
     update Sessions
-    set rid = new_rid
-    where course_id = cid and launch_date = launch_date and sid = session_num;
+    set rid = _new_rid
+    where course_id = _cid and launch_date = _launch_date and sid = _session_num;
 END;
 $$ LANGUAGE plpgsql;
