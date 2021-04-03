@@ -257,9 +257,6 @@ CREATE TABLE Buys
     CONSTRAINT non_negative_redemptions check (num_remaining_redemptions >= 0)
 );
 
--- TODO (DONE?): TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
--- TODO (DONE): TRIGGER - course offering is said to be available if the number of registrations received is no more
---  than its seating capacity; otherwise, we say that a course offering is fully booked.
 -- NOTE: card_number not included as an attribute
 CREATE TABLE Redeems
 (
@@ -282,9 +279,6 @@ CREATE TABLE Redeems
     CONSTRAINT purchase_package_before_redeem check (buy_date <= redeem_date)
 );
 
--- TODO (DONE): TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
--- TODO (DONE): TRIGGER - course offering is said to be available if the number of registrations received is no more
---  than its seating capacity; otherwise, we say that a course offering is fully booked.
 -- NOTE: card_number not part of pri key
 CREATE TABLE Registers
 (
