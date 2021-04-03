@@ -114,7 +114,7 @@ BEGIN
             select registration_deadline
             from Offerings
             where eid = new.eid) then
-        raise notice 'Departure date for employee id % is not updated.', eid;
+        raise notice 'Administrator % is still handling some course offerings.', new.eid;
         return null;
     -- condition 2
     elseif new.eid in (select eid from Instructors)
@@ -122,12 +122,12 @@ BEGIN
             select session_date
             from Sessions
             where eid = new.eid) then
-       raise notice 'Departure date for employee id % is not updated.', eid;
+       raise notice 'Instructor % is due to teach some course sessions.', new.eid;
        return null;
     -- condition 3
     elseif new.eid in (select eid from Managers)
         and new.eid in (select eid from Course_areas) then
-        raise notice 'Departure date for employee id % is not updated.', eid;
+        raise notice 'Manager % is still managing some course areas.', new.eid;
         return null;
     else
         return new;
