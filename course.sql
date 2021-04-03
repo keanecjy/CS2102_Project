@@ -74,7 +74,7 @@ BEGIN
             SELECT eid INTO inst_eid FROM find_instructors(cid, s_date, s_time) LIMIT 1;
 
             INSERT INTO Sessions
-            VALUES (next_sid, l_date, cid, s_date, s_time, s_time + course_duration, s_rid, inst_eid);
+            VALUES (next_sid, l_date, cid, s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid, inst_eid);
 
             seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
             inst_eid := NULL;

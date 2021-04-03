@@ -35,7 +35,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS update_employee_departure ON Employees;
 
-CREATE CONSTRAINT TRIGGER update_employee_departure BEFORE UPDATE ON Employees
+CREATE TRIGGER update_employee_departure BEFORE UPDATE ON Employees
 FOR EACH ROW WHEN (new.depart_date is not null)
 EXECUTE FUNCTION update_employee_departure();
 
@@ -138,6 +138,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS instructors_specialization_checks on Sessions;
+
 CREATE TRIGGER instructors_specialization_checks
 BEFORE INSERT OR UPDATE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION instructors_specialization_checks();
@@ -162,6 +164,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS instructors_part_time_duration_checks on Sessions;
+
 CREATE TRIGGER instructors_part_time_duration_checks
 BEFORE INSERT OR UPDATE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
@@ -183,6 +187,9 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS instructors_overlap_timing_checks on Sessions;
+
 CREATE TRIGGER instructors_overlap_timing_checks
 BEFORE INSERT OR UPDATE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION instructors_overlap_timing_checks();
@@ -200,12 +207,14 @@ BEGIN
                   AND (S.start_time, S.end_time) OVERLAPS (NEW.start_time, NEW.end_time)
         )
         ) THEN
-        RAISE EXCEPTION 'This room is already taken by another session';
+        RAISE EXCEPTION 'Room % is already taken by another session', NEW.rid;
         RETURN NULL;
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS room_availability_checks on Sessions;
 
 CREATE TRIGGER room_availability_checks
 BEFORE INSERT OR UPDATE ON Sessions
@@ -265,6 +274,7 @@ CREATE TRIGGER delete_session_checks
 BEFORE DELETE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION delete_session_checks();
 
+-- TODO: CHECK  
 -- HELPER FUNCTION FOR THE TRIGGERS ONLY
 CREATE OR REPLACE FUNCTION is_not_unique_session_per_course(IN date_of_launch DATE, IN course_id INT, IN cus_id INT)
     RETURNS BOOLEAN AS $$
@@ -402,7 +412,7 @@ CREATE OR REPLACE FUNCTION after_insert_into_offerings()
 $$
 BEGIN
     IF (NOT EXISTS (SELECT 1 FROM Sessions S WHERE S.launch_date = NEW.launch_date AND S.course_id = NEW.course_id)) THEN
-        RAISE EXCEPTION 'There isnt any session in this offerings %', NEW.course_id;
+        RAISE EXCEPTION 'There isnt any session in this course offerings: %', NEW.course_id;
     END IF;
     RETURN NEW;
 END;
@@ -417,13 +427,14 @@ CREATE OR REPLACE FUNCTION before_delete_of_sessions()
     RETURNS TRIGGER AS
 $$
 BEGIN
-    IF (1 = (SELECT COUNT(*) FROM Sessions S WHERE S.launch_date = OLD.launch_date AND S.course_id = OLD.course_id)) THEN
-        RAISE EXCEPTION  'You cant delete this session after there will be no more session % left in this offering %', OLD.sid, OLD.courseid;
+    IF (EXISTS (SELECT 1 FROM Offerings WHERE launch_date = OLD.launch_date AND course_id = OLD.Course_id) AND
+        (SELECT COUNT(*) FROM Sessions S WHERE S.launch_date = OLD.launch_date AND S.course_id = OLD.course_id) = 0) THEN
+        RAISE EXCEPTION  'You cant delete this session as there will be no more session left for this offering: %', OLD.course_id;
     END IF;
     RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER before_delete_of_sessions
-BEFORE DELETE ON Sessions
+CREATE CONSTRAINT TRIGGER before_delete_of_sessions
+AFTER DELETE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION before_delete_of_sessions();

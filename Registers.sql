@@ -148,16 +148,17 @@ CREATE OR REPLACE FUNCTION get_my_registrations(IN cus_id INT)
     RETURNS TABLE (course_name TEXT, course_fee FLOAT, session_date DATE, start_hour TIME, duration INT, instructor_name TEXT) AS $$
 DECLARE
 BEGIN
+    return query
     with
         Q0 AS (SELECT launch_date, course_id, fees FROM Offerings),
-        Q1 AS (SELECT * FROM (Specializes NATURAL JOIN Courses NATURAL JOIN Q0 NATURAL JOIN Sessions)),
-        Q2 AS (SELECT * FROM (Q1 NATURAL JOIN Redeems) WHERE cust_id = cus_id AND session_date > current_date),
-        Q3 AS (SELECT * FROM (Q1 NATURAL JOIN Registers) WHERE cust_id = cus_id AND session_date > current_date)
+        Q1 AS (SELECT * FROM (Employees NATURAL JOIN Specializes NATURAL JOIN Courses NATURAL JOIN Q0 NATURAL JOIN Sessions)),
+        Q2 AS (SELECT * FROM (Q1 NATURAL JOIN Redeems) A WHERE cust_id = cus_id AND A.session_date > current_date),
+        Q3 AS (SELECT * FROM (Q1 NATURAL JOIN Registers) B WHERE cust_id = cus_id AND B.session_date > current_date)
     SELECT *
     FROM (SELECT Q2.title, Q2.fees, Q2.session_date, Q2.start_time, Q2.duration, Q2.name FROM Q2
           UNION
           SELECT Q3.title, Q3.fees, Q3.session_date, Q3.start_time, Q3.duration, Q3.name FROM Q3) AS ANS
-    ORDER BY (session_date, start_hour);
+    ORDER BY (ANS.session_date, ANS.start_time);
 END;
 $$ LANGUAGE plpgsql;
 

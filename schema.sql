@@ -157,6 +157,7 @@ CREATE TABLE Offerings
     CONSTRAINT registration_deadline_10_days_before_start check (
         registration_deadline + interval '10 days' <= start_date
     ),
+    -- CONSTRAINT seating_capacity_at_least_equal_target_reg check (seating_capacity >= target_number_registrations),
     CONSTRAINT non_negative_target_registrations check (target_number_registrations >= 0),
     CONSTRAINT non_negative_fees check (fees >= 0)
 );
