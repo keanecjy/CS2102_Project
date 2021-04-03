@@ -15,19 +15,16 @@ INSERT INTO Courses
 VALUES (COALESCE((SELECT MAX(course_id) FROM Courses), 0) + 1, course_title, course_desc, course_area, duration);
 $$ LANGUAGE sql;
 
+
 -- /*
 -- Check for
 -- 1. Valid course offering
 -- 2. Sufficient instructors to add all of sessions
 -- - Use an array to keep track of all the new session_ids added. If one of the sessions fail to find an instructor,
--- we will rollback all the insertions into Sessions table.
--- 3. reg_deadline at least 10 days before start date
--- 4.
+-- we terminate
 -- */
-
--- TODO: Add target num of registrations to params
 CREATE OR REPLACE PROCEDURE add_course_offering(cid int, l_date date, fees float, reg_deadline date,
-                                                admin_id int, sessions_arr text[][]) AS
+                                                target_num int, admin_id int, sessions_arr text[][]) AS
 $$
 
 DECLARE
@@ -45,8 +42,7 @@ DECLARE
 
 BEGIN
     -- 	Checking validity of course offering information
-    IF (cid NOT IN (SELECT course_id FROM Courses) OR fees < 0 OR (ARRAY_LENGTH(sessions_arr, 1) = 0) OR
-        (admin_id NOT IN (SELECT eid FROM Administrators)) OR (reg_deadline + 10 <= l_date)) THEN
+    IF (ARRAY_LENGTH(sessions_arr, 1) = 0) THEN
         RAISE EXCEPTION 'Course offering details are invalid';
     END IF;
 
@@ -64,19 +60,18 @@ BEGIN
             s_time := temp[2]::time;
             s_rid := temp[3];
 
-            IF (earliest_start_date IS NULL OR earliest_start_date > s_date) THEN earliest_start_date := s_date; END IF;
+            IF (earliest_start_date IS NULL OR earliest_start_date > s_date)
+            THEN
+                earliest_start_date := s_date;
+            END IF;
 
-            IF (latest_end_date IS NULL OR latest_end_date < s_date) THEN latest_end_date := s_date; END IF;
+            IF (latest_end_date IS NULL OR latest_end_date < s_date)
+            THEN
+                latest_end_date := s_date;
+            END IF;
 
             -- Find an eid from the list of available instructors (do we need to find the most optimal?)
             SELECT eid INTO inst_eid FROM find_instructors(cid, s_date, s_time) LIMIT 1;
-
-            IF (inst_eid IS NULL) THEN
-                -- TODO: Cleanup by deleting previously added sessions?
-                RAISE EXCEPTION 'Not able to find instructor to allocate';
-            END IF;
-
-            IF (NOT EXISTS(SELECT 1 FROM Rooms WHERE rid = s_rid)) THEN RAISE EXCEPTION 'Room does not exist'; END IF;
 
             INSERT INTO Sessions
             VALUES (next_sid, l_date, cid, s_date, s_time, s_time + course_duration, s_rid, inst_eid);
@@ -91,7 +86,7 @@ BEGIN
     UPDATE Offerings
     SET start_date                  = earliest_start_date,
         end_date                    = latest_end_date,
-        target_number_registrations = seat_capacity,
+        target_number_registrations = target_num,
         seating_capacity            = seat_capacity
     WHERE cid = course_id
       AND launch_date = l_date;
@@ -99,6 +94,7 @@ BEGIN
 END;
 
 $$ LANGUAGE plpgsql;
+
 
 
 -- Helper function to create table containing all registers and redeems

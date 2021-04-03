@@ -133,6 +133,7 @@ CREATE TABLE Courses
 );
 
 -- NOTE: eid refers to administrator of the course offering
+-- TODO: Trigger - to enforce total participation, every Offerings has >= 1 Sessions
 CREATE TABLE Offerings
 (
     launch_date 				date not null,
@@ -161,7 +162,6 @@ CREATE TABLE Offerings
     CONSTRAINT non_negative_fees check (fees >= 0)
 );
 
--- TODO: Trigger - to enforce total participation, every Offerings has >= 1 Sessions
 -- TODO: Trigger - start date and end date of Offerings is updated to the earliest and latest session_date
 -- TODO: Trigger - each instructor at most one course session at any hour
 -- TODO: Trigger - each instructor must not teach 2 consecutive sessions (1 hr break)
@@ -266,6 +266,9 @@ CREATE TABLE Buys
     CONSTRAINT non_negative_redemptions check (num_remaining_redemptions >= 0)
 );
 
+-- TODO (DONE?): TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
+-- TODO (DONE): TRIGGER - course offering is said to be available if the number of registrations received is no more
+--  than its seating capacity; otherwise, we say that a course offering is fully booked.
 -- NOTE: card_number not included as an attribute
 CREATE TABLE Redeems
 (
@@ -279,6 +282,8 @@ CREATE TABLE Redeems
     launch_date date,
     course_id   int,
 
+    -- Enforces the a customer can register for at most one of its sessions?
+    unique (cust_id, course_id, launch_date),
     primary key (redeem_date, buy_date, cust_id, package_id, sid, launch_date, course_id),
     foreign key (buy_date, cust_id, package_id) references Buys,
     foreign key (sid, launch_date, course_id) references Sessions,
@@ -286,8 +291,9 @@ CREATE TABLE Redeems
     CONSTRAINT purchase_package_before_redeem check (buy_date <= redeem_date)
 );
 
--- TODO: TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
--- TODO: TRIGGER - course offering is said to be available if the number of registrations received is no more than its seating capacity; otherwise, we say that a course offering is fully booked
+-- TODO (DONE): TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
+-- TODO (DONE): TRIGGER - course offering is said to be available if the number of registrations received is no more
+--  than its seating capacity; otherwise, we say that a course offering is fully booked.
 -- NOTE: card_number not part of pri key
 CREATE TABLE Registers
 (
@@ -300,6 +306,8 @@ CREATE TABLE Registers
     launch_date 	date,
     course_id 		int,
 
+    -- Enforces the a customer can register for at most one of its sessions?
+    unique (cust_id, course_id, launch_date),
     primary key (register_date, cust_id, sid, launch_date, course_id),
     foreign key (cust_id, card_number) references Credit_cards (cust_id, card_number),
     foreign key (sid, launch_date, course_id) references Sessions

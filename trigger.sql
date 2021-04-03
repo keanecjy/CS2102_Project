@@ -268,15 +268,17 @@ Trigger to check for inserting/updating a registration/redemption of session.
 1) Check if current_date have already past the session_date itself
 2) Check if current_date have already past the registration_deadline
 3) Check if number of registration + redeems <= seating_capacity
+4) Check if customer register for more than 1 session in this course offering.
 
 */
 CREATE OR REPLACE FUNCTION reg_redeem_check()
     RETURNS trigger AS
 $$
 DECLARE
-    deadline date;
-    s_date   date;
-    seat_cap int;
+    deadline       date;
+    s_date         date;
+    seat_cap       int;
+    num_registered int;
 
 BEGIN
 
@@ -294,6 +296,18 @@ BEGIN
       AND new.launch_date = launch_date
       AND new.course_id = course_id;
 
+    SELECT COUNT(*)
+    INTO num_registered
+    FROM Redeems
+    WHERE new.launch_date = launch_date
+      AND new.course_id = course_id;
+
+    num_registered := num_registered + (SELECT COUNT(*)
+                                        INTO num_registered
+                                        FROM Registers
+                                        WHERE new.launch_date = launch_date
+                                          AND new.course_id = course_id);
+
     -- Check if current_date have already past the session_date or registration deadline
     IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
         RAISE NOTICE 'It is too late to register for this session!';
@@ -306,6 +320,18 @@ BEGIN
         RETURN NULL;
     END IF;
 
+    -- Checks if customer has already registered for the session
+    IF (num_registered = 1) THEN
+        IF (TG_OP = 'INSERT') THEN
+            RAISE NOTICE 'Customer can only register for one session for a course offering';
+            RETURN NULL;
+        ELSE
+            IF (old.launch_date <> new.launch_date OR old.course_id <> new.course_id OR old.cust_id <> new.cust_id) THEN
+                RAISE NOTICE 'Customer can only register for one session for a course offering';
+                RETURN NULL;
+            END IF;
+        END IF;
+    END IF;
     RETURN new;
 END;
 
