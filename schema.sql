@@ -162,15 +162,6 @@ CREATE TABLE Offerings
     CONSTRAINT non_negative_fees check (fees >= 0)
 );
 
--- TODO: Trigger - start date and end date of Offerings is updated to the earliest and latest session_date
--- TODO: Trigger - each instructor at most one course session at any hour
--- TODO: Trigger - each instructor must not teach 2 consecutive sessions (1 hr break)
--- TODO: Trigger - each part-time instructor total hours per month <= 30
--- TODO: Trigger - the assigned instructor must specialise in that course_area
--- TODO: Trigger - update seating_capacity in Offerings to sum of seating capacities of sessions
--- TODO: Trigger - Each room can be used to conduct at most one course session at any time
--- TODO: Trigger - This constraint have to be in trigger as subquery not allowed in check
---
 -- NOTE: eid refers to instructors of the session
 CREATE TABLE Sessions
 (
