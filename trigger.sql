@@ -148,15 +148,14 @@ FOR EACH ROW EXECUTE FUNCTION instructors_specialization_checks();
 CREATE OR REPLACE FUNCTION instructors_part_time_duration_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    span interval;
-    max_hour interval := concat(30, ' hours')::interval;
+    span int;
 BEGIN
-    SELECT DISTINCT concat(duration, ' hours')::interval INTO span
+    SELECT duration into span
     FROM Courses
     WHERE course_id = NEW.course_id;
 
     -- VALIDATE PART-TIME INSTRUCTOR
-    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((concat((SELECT get_hours(NEW.eid)), ' hours')::interval) + span > max_hour)) THEN
+    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((SELECT get_hours(NEW.eid)) + span > 30)) THEN
         RAISE EXCEPTION 'This part-time instructor is going to be OVERWORKED if he take this session!';
         RETURN NULL;
     END IF;
@@ -175,9 +174,8 @@ FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
 CREATE OR REPLACE FUNCTION instructors_overlap_timing_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    one_hour interval;
+    one_hour interval := concat(1, ' hours')::interval;
 BEGIN
-    one_hour := concat(1, ' hours')::interval;
     -- VALIDATE AT MOST ONE COURSE SESSION AT ANY HOUR AND NOT TEACH 2 CONSECUTIVE SESSIONS
     IF (EXISTS(SELECT 1 FROM Sessions S WHERE S.session_date = NEW.session_date AND S.eid = NEW.eid
                                           AND (NEW.start_time, NEW.end_time) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour))) THEN
@@ -356,36 +354,28 @@ BEGIN
     INTO num_registered
     FROM Redeems
     WHERE new.launch_date = launch_date
-      AND new.course_id = course_id;
+      AND new.course_id = course_id
+      AND new.cust_id = cust_id;
 
     num_registered := num_registered + (SELECT COUNT(*)
                                         FROM Registers
                                         WHERE new.launch_date = launch_date
-                                          AND new.course_id = course_id);
+                                          AND new.course_id = course_id
+                                          AND new.cust_id = cust_id);
 
     -- Check if current_date have already past the session_date or registration deadline
     IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
-        RAISE NOTICE 'It is too late to register for this session!';
-        RETURN NULL;
+        RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
 
     -- Check if there is enough slots in the session
-    IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) >= seat_cap) THEN
-        RAISE NOTICE 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
-        RETURN NULL;
+    IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) > seat_cap) THEN
+        RAISE EXCEPTION 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
     END IF;
 
     -- Checks if customer has already registered for the session
-    IF (num_registered = 1) THEN
-        IF (TG_OP = 'INSERT') THEN
-            RAISE NOTICE 'Customer can only register for one session for a course offering';
-            RETURN NULL;
-        ELSE
-            IF (old.launch_date <> new.launch_date OR old.course_id <> new.course_id OR old.cust_id <> new.cust_id) THEN
-                RAISE NOTICE 'Customer can only register for one session for a course offering';
-                RETURN NULL;
-            END IF;
-        END IF;
+    IF (num_registered >= 2) THEN
+        raise EXCEPTION 'Customer has already registered for a session in this course offering!';
     END IF;
     RETURN new;
 END;
@@ -397,13 +387,13 @@ DROP TRIGGER IF EXISTS valid_session ON Redeems;
 DROP TRIGGER IF EXISTS valid_session ON Registers;
 
 CREATE TRIGGER valid_session
-    BEFORE INSERT OR UPDATE
+    AFTER INSERT OR UPDATE
     ON Redeems
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();
 
 CREATE TRIGGER valid_session
-    BEFORE INSERT OR UPDATE
+    AFTER INSERT OR UPDATE
     ON Registers
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();

@@ -21,40 +21,6 @@ BEGIN
     /*
      * Dont need to check validity of buy_date, pid, card_number, session_number, cid, date_of_launch etc as it should be check via the foreign key?
      */
-    SELECT registration_deadline, seating_capacity INTO deadline, capacity
-    FROM Offerings
-    WHERE launch_date = date_of_launch
-      AND course_id = in_cid;
-
-    IF (current_date > deadline) THEN
-        RAISE EXCEPTION 'The registration deadline for this course have already have passed!';
-    END IF;
-
-    SELECT S.session_date INTO date_of_session
-    FROM Sessions S
-    WHERE launch_date = date_of_launch
-      AND course_id = in_cid
-      AND S.sid = session_number;
-
-    IF (current_date > date_of_session) THEN
-        RAISE EXCEPTION 'This session have already passed, you cant register for it';
-    END IF;
-
-    SELECT COUNT(*) INTO num_reg
-    FROM Registers R
-    WHERE R.sid = session_number
-      AND R.launch_date = date_of_launch
-      AND R.course_id = in_cid;
-
-    SELECT COUNT(*) INTO num_redeem
-    FROM Redeems R
-    WHERE R.sid = session_number
-      AND R.launch_date = date_of_launch
-      AND R.course_id = in_cid;
-
-    IF (num_reg + num_redeem + 1 > capacity) THEN
-        RAISE EXCEPTION 'This session course is already full!';
-    END IF;
 
     IF (pay_method = 'redeem') THEN
         
@@ -88,6 +54,7 @@ DECLARE
     date_of_session DATE;
     date_of_buy DATE;
     pid INT;
+    cost float;
 BEGIN
     -- we know that for a course, that customer only have 1 session
     -- if cancelled at least 7 days before the day of registered sessions, will have to credit an extra course session to customer 
@@ -128,12 +95,21 @@ BEGIN
         WHERE R.cust_id = cus_id
           AND R.course_id = in_cid
           AND R.launch_date = date_of_launch;
+        
+        INSERT INTO Cancels VALUES (current_date, null, 1, cus_id, sid_redeem, date_of_launch, in_cid);
     ELSE
         -- DELETE FROM registers
         DELETE FROM Registers R
         WHERE R.cust_id = cus_id
           AND R.course_id = in_cid
           AND R.launch_date = date_of_launch;
+        
+        IF (current_date + 7 <= date_of_session) THEN
+            select fees into cost FROM Offerings WHERE course_id = in_cid AND launch_date = date_of_launch;
+            INSERT INTO Cancels VALUES (current_date, 0.9 * cost, null, cus_id, sid_register, date_of_launch, in_cid);
+        ELSE
+            INSERT INTO Cancels VALUES (current_date, 0, null, cus_id, sid_register, date_of_launch, in_cid);
+        end if;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
