@@ -274,14 +274,13 @@ CREATE TRIGGER delete_session_checks
 BEFORE DELETE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION delete_session_checks();
 
--- TODO: CHECK  
 -- HELPER FUNCTION FOR THE TRIGGERS ONLY
-CREATE OR REPLACE FUNCTION is_not_unique_session_per_course(IN date_of_launch DATE, IN course_id INT, IN cus_id INT)
+CREATE OR REPLACE FUNCTION is_not_unique_session_per_course(IN date_of_launch DATE, IN _course_id INT, IN cus_id INT)
     RETURNS BOOLEAN AS $$
 BEGIN
-    RETURN (EXISTS (SELECT 1 FROM Registers R WHERE R.launch_date = date_of_launch AND R.course_id = course_id AND R.cust_id = cus_id)
+    RETURN (EXISTS (SELECT 1 FROM Registers R WHERE R.launch_date = date_of_launch AND R.course_id = _course_id AND R.cust_id = cus_id)
         OR
-            EXISTS (SELECT 1 FROM Redeems R WHERE R.launch_date = date_of_launch AND R.course_id = course_id AND R.cust_id = cus_id));
+            EXISTS (SELECT 1 FROM Redeems R WHERE R.launch_date = date_of_launch AND R.course_id = _course_id AND R.cust_id = cus_id));
 END;
 $$ LANGUAGE plpgsql;
 
@@ -356,7 +355,6 @@ BEGIN
       AND new.course_id = course_id;
 
     num_registered := num_registered + (SELECT COUNT(*)
-                                        INTO num_registered
                                         FROM Registers
                                         WHERE new.launch_date = launch_date
                                           AND new.course_id = course_id);

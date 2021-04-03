@@ -68,7 +68,7 @@ BEGIN
         -- decrement the num of remaining redemptions for that particular package
         UPDATE Buys B
         SET num_remaining_redemptions = num_remaining_redemptions - 1
-        WHERE B.cust_id = cus_id
+        WHERE B.cust_id = cus_id;
 
     ELSIF (pay_method = 'card') THEN
         SELECT card_number INTO num_card FROM get_active_card(cus_id);
