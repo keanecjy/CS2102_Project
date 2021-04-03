@@ -9,12 +9,11 @@ popular_courses:
 */
 
 -- Adds a course into the courses table
-create or replace procedure add_course(course_title text, course_desc text, course_area text, duration integer)
-AS
+CREATE OR REPLACE PROCEDURE add_course(course_title text, course_desc text, course_area text, duration integer) AS
 $$
-insert into Courses
-values (coalesce((select max(course_id) from Courses), 0) + 1, course_title, course_desc, course_area, duration);
-$$ language sql;
+INSERT INTO Courses
+VALUES (COALESCE((SELECT MAX(course_id) FROM Courses), 0) + 1, course_title, course_desc, course_area, duration);
+$$ LANGUAGE sql;
 
 -- /*
 -- Check for
@@ -27,9 +26,8 @@ $$ language sql;
 -- */
 
 -- TODO: Add target num of registrations to params
-create or replace procedure add_course_offering(cid int, l_date date, fees float, reg_deadline date,
-                                                admin_id int, sessions_arr text[][])
-AS
+CREATE OR REPLACE PROCEDURE add_course_offering(cid int, l_date date, fees float, reg_deadline date,
+                                                admin_id int, sessions_arr text[][]) AS
 $$
 
 DECLARE
@@ -47,78 +45,65 @@ DECLARE
 
 BEGIN
     -- 	Checking validity of course offering information
-    if (cid not in (select course_id from Courses)
-        or fees < 0
-        or (array_length(sessions_arr, 1) = 0)
-        or (admin_id not in (select eid from Administrators))
-        or (reg_deadline + 10 <= l_date)) then
-        raise exception 'Course offering details are invalid';
-    end if;
+    IF (cid NOT IN (SELECT course_id FROM Courses) OR fees < 0 OR (ARRAY_LENGTH(sessions_arr, 1) = 0) OR
+        (admin_id NOT IN (SELECT eid FROM Administrators)) OR (reg_deadline + 10 <= l_date)) THEN
+        RAISE EXCEPTION 'Course offering details are invalid';
+    END IF;
 
-    select area_name, duration into course_area, course_duration from Courses where course_id = cid;
+    SELECT area_name, duration INTO course_area, course_duration FROM Courses WHERE course_id = cid;
     next_sid := 1;
     seat_capacity := 0;
 
     -- Temp insertion to allow adding of Sessions
-    insert into Offerings
-    values (l_date, cid, reg_deadline, null, null, admin_id, 0, 0, fees);
+    INSERT INTO Offerings VALUES (l_date, cid, reg_deadline, NULL, NULL, admin_id, 0, 0, fees);
 
     -- Adding each session in
-    foreach temp in array sessions_arr
-        loop
+    FOREACH temp IN ARRAY sessions_arr
+        LOOP
             s_date := temp[1]::date;
             s_time := temp[2]::time;
             s_rid := temp[3];
 
-            if (earliest_start_date is null or earliest_start_date > s_date) then
-                earliest_start_date := s_date;
-            end if;
+            IF (earliest_start_date IS NULL OR earliest_start_date > s_date) THEN earliest_start_date := s_date; END IF;
 
-            if (latest_end_date is null or latest_end_date < s_date) then
-                latest_end_date := s_date;
-            end if;
+            IF (latest_end_date IS NULL OR latest_end_date < s_date) THEN latest_end_date := s_date; END IF;
 
             -- Find an eid from the list of available instructors (do we need to find the most optimal?)
-            select eid
-            into inst_eid
-            from find_instructors(cid, s_date, s_time)
-            limit 1;
+            SELECT eid INTO inst_eid FROM find_instructors(cid, s_date, s_time) LIMIT 1;
 
-            if (inst_eid is null) then
+            IF (inst_eid IS NULL) THEN
                 -- TODO: Cleanup by deleting previously added sessions?
-                raise exception 'Not able to find instructor to allocate';
-            end if;
+                RAISE EXCEPTION 'Not able to find instructor to allocate';
+            END IF;
 
-            if (not exists(select 1 from Rooms where rid = s_rid)) then
-                raise exception 'Room does not exist';
-            end if;
+            IF (NOT EXISTS(SELECT 1 FROM Rooms WHERE rid = s_rid)) THEN RAISE EXCEPTION 'Room does not exist'; END IF;
 
-            insert into Sessions
-            values (next_sid, l_date, cid, s_date, s_time, s_time + course_duration, s_rid, inst_eid);
+            INSERT INTO Sessions
+            VALUES (next_sid, l_date, cid, s_date, s_time, s_time + course_duration, s_rid, inst_eid);
 
-            seat_capacity := seat_capacity + (select seating_capacity from Rooms where rid = s_rid);
-            inst_eid := null;
+            seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
+            inst_eid := NULL;
             next_sid := next_sid + 1;
 
-        end loop;
+        END LOOP;
 
     -- Update the course offerings record after all sessions are inserted
-    update Offerings
-    set start_date                  = earliest_start_date,
+    UPDATE Offerings
+    SET start_date                  = earliest_start_date,
         end_date                    = latest_end_date,
         target_number_registrations = seat_capacity,
         seating_capacity            = seat_capacity
-    where cid = course_id
-      and launch_date = l_date;
+    WHERE cid = course_id
+      AND launch_date = l_date;
 
 END;
 
-$$ language plpgsql;
+$$ LANGUAGE plpgsql;
 
 
 -- Helper function to create table containing all registers and redeems
-create or replace function combine_reg_redeems()
-    returns table
+CREATE OR REPLACE FUNCTION combine_reg_redeems()
+    RETURNS table
             (
                 cust_id       int,
                 sid           int,
@@ -129,13 +114,13 @@ create or replace function combine_reg_redeems()
 AS
 $$
 
-select cust_id, sid, launch_date, course_id, register_date
-from Registers
-union
-select cust_id, sid, launch_date, course_id, redeem_date
-from Redeems;
+SELECT cust_id, sid, launch_date, course_id, register_date
+FROM Registers
+UNION
+SELECT cust_id, sid, launch_date, course_id, redeem_date
+FROM Redeems;
 
-$$ language sql;
+$$ LANGUAGE sql;
 
 -- -- Helper function to query the num of registrations for the offering
 -- create or replace function get_num_registration_for_offering(cid int, date_launch date)
@@ -149,22 +134,21 @@ $$ language sql;
 
 
 -- Helper function to query the num of registrations for the session
-create or replace function get_num_registration_for_session(session_id int, date_launch date, cid int)
-    returns int AS
+CREATE OR REPLACE FUNCTION get_num_registration_for_session(session_id int, date_launch date, cid int) RETURNS int AS
 $$
-select count(*)
-from combine_reg_redeems()
-where sid = session_id
-  and launch_date = date_launch
-  and course_id = cid;
-$$ language sql;
+SELECT COUNT(*)
+FROM combine_reg_redeems()
+WHERE sid = session_id
+  AND launch_date = date_launch
+  AND course_id = cid;
+$$ LANGUAGE sql;
 
 -- Q15
 -- Retrieves all course offerings that can be registered
 -- Output is sorted in ascending order of registration deadline and course title.
 -- Can be registered == seating_capacity - numRegistered > 0
-create or replace function get_available_course_offerings()
-    returns table
+CREATE OR REPLACE FUNCTION get_available_course_offerings()
+    RETURNS table
             (
                 title                 text,
                 area_name             text,
@@ -176,32 +160,24 @@ create or replace function get_available_course_offerings()
             )
 AS
 $$
-with NumRegistered as (
-    select course_id, launch_date, count(*) as numReg
-    from combine_reg_redeems()
-    group by course_id, launch_date
-)
+WITH NumRegistered AS (SELECT course_id, launch_date, COUNT(*) AS numReg
+                       FROM combine_reg_redeems()
+                       GROUP BY course_id, launch_date)
 
-select title,
-       area_name,
-       start_date,
-       end_date,
-       registration_deadline,
-       fees,
-       seating_capacity - coalesce(numReg, 0)
-from (Courses natural join Offerings)
-         natural left join NumRegistered
-where start_date >= current_date
-  and seating_capacity - coalesce(numReg, 0) > 0;
+SELECT title, area_name, start_date, end_date, registration_deadline, fees, seating_capacity - COALESCE(numReg, 0)
+FROM (Courses NATURAL JOIN Offerings)
+         NATURAL LEFT JOIN NumRegistered
+WHERE start_date >= CURRENT_DATE
+  AND seating_capacity - COALESCE(numReg, 0) > 0;
 
-$$ language sql;
+$$ LANGUAGE sql;
 
 
 
 -- Q16
 -- Retrieve all the available sessions for a course offering that could be registered.
-create or replace function get_available_course_sessions(cid int, date_of_launch date)
-    returns table
+CREATE OR REPLACE FUNCTION get_available_course_sessions(cid int, date_of_launch date)
+    RETURNS table
             (
                 session_date    date,
                 start_time      time,
@@ -210,16 +186,15 @@ create or replace function get_available_course_sessions(cid int, date_of_launch
             )
 AS
 $$
-select session_date, start_time, name, seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid)
-from (Sessions
-    natural join Rooms)
-         natural join Employees
-where course_id = cid
-  and launch_date = date_of_launch
-  and session_date >= current_date
-  and seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid) > 0;
+SELECT session_date, start_time, name, seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid)
+FROM (Sessions NATURAL JOIN Rooms)
+         NATURAL JOIN Employees
+WHERE course_id = cid
+  AND launch_date = date_of_launch
+  AND session_date >= CURRENT_DATE
+  AND seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid) > 0;
 
-$$ language sql;
+$$ LANGUAGE sql;
 
 
 
@@ -230,44 +205,40 @@ Q19
 3. Check for current_date before registration deadline
 
 */
-create or replace procedure update_course_session(customer_id int, cid int, date_launch date, new_sid int)
-AS
+CREATE OR REPLACE PROCEDURE update_course_session(customer_id int, cid int, date_launch date, new_sid int) AS
 $$
-
 BEGIN
-    if (exists(select 1
-               from Redeems
-               where cust_id = customer_id
-                 and course_id = cid
-                 and launch_date = date_launch)) then
+    IF (EXISTS(
+            SELECT 1 FROM Redeems WHERE cust_id = customer_id AND course_id = cid AND launch_date = date_launch)) THEN
 
-        update Redeems
-        set sid         = new_sid,
-            redeem_date = current_date
-        where cust_id = customer_id
-          and course_id = cid
-          and launch_date = date_launch;
-    else
-        update Registers
-        set sid         = new_sid,
-            redeem_date = current_date
-        where cust_id = customer_id
-          and course_id = cid
-          and launch_date = date_launch;
-    end if;
+        UPDATE Redeems
+        SET sid         = new_sid,
+            redeem_date = CURRENT_DATE
+        WHERE cust_id = customer_id
+          AND course_id = cid
+          AND launch_date = date_launch;
+    ELSE
+        UPDATE Registers
+        SET sid         = new_sid,
+            redeem_date = CURRENT_DATE
+        WHERE cust_id = customer_id
+          AND course_id = cid
+          AND launch_date = date_launch;
+    END IF;
 END;
-$$ language plpgsql;
+$$ LANGUAGE plpgsql;
 
 
 /*
+
+Q26
 1. Check for inactive customers
 2. For each inactive customer, find:
 	- Course area A, whereby at least one of the three most recent course offerings are in A
 	- If customer has not registered for any course offerings, every course area is of interest.
-	-
 */
-create or replace function promote_courses()
-    returns table
+CREATE OR REPLACE FUNCTION promote_courses()
+    RETURNS table
             (
                 cust_id      int,
                 cust_name    text,
@@ -280,68 +251,97 @@ create or replace function promote_courses()
             )
 AS
 $$
-with InActiveCust as (
-    select cust_id
-    from Customers
-             natural join combine_reg_redeems()
-    group by cust_id
-    having max(register_date) + interval '5 months' < date_trunc('month', current_date)
-),
- CustWithNoOfferings as (
-     select cust_id, name
-     from Customers
-     where cust_id not in (select cust_id from combine_reg_redeems())
- ),
- NumRegistered as (
-     select course_id, launch_date, count(*) as numReg
-     from combine_reg_redeems()
-     group by course_id, launch_date
- ),
- ValidOfferings as (
-     select *
-     from (Offerings natural left join NumRegistered)
-              natural join Courses
-     where registration_deadline >= current_date
-       and seating_capacity - coalesce(numReg, 0) > 0
- ),
- Res as (
-     select cust_id,
-            name,
-            area_name,
-            course_id,
-            title,
-            launch_date,
-            registration_deadline,
-            fees
-     from (CustWithNoOfferings
-              natural join Customers),
-          ValidOfferings
+WITH InActiveCust AS (SELECT cust_id
+                      FROM Customers
+                               NATURAL JOIN combine_reg_redeems()
+                      GROUP BY cust_id
+                      HAVING MAX(register_date) + INTERVAL '5 months' < DATE_TRUNC('month', CURRENT_DATE)),
+     CustWithNoOfferings AS (SELECT cust_id, name
+                             FROM Customers
+                             WHERE cust_id NOT IN (SELECT cust_id FROM combine_reg_redeems())),
+     NumRegistered AS (SELECT course_id, launch_date, COUNT(*) AS numReg
+                       FROM combine_reg_redeems()
+                       GROUP BY course_id, launch_date),
+     ValidOfferings AS (SELECT *
+                        FROM (Offerings NATURAL LEFT JOIN NumRegistered)
+                                 NATURAL JOIN Courses
+                        WHERE registration_deadline >= CURRENT_DATE
+                          AND seating_capacity - COALESCE(numReg, 0) > 0),
+     Res AS (SELECT cust_id,
+                    name,
+                    area_name,
+                    course_id,
+                    title,
+                    launch_date,
+                    registration_deadline,
+                    fees
+             FROM (CustWithNoOfferings
+                      NATURAL JOIN Customers),
+                  ValidOfferings
 
-     union
+             UNION
 
-     select cust_id,
-            (select name from Customers where cust_id = R4.cust_id),
-            area_name,
-            course_id,
-            title,
-            launch_date,
-            registration_deadline,
-            fees
-     from InActiveCust R4,
-          ValidOfferings R5
-     where R5.area_name
-               in (
-               select area_name
-               from Courses
-                        natural join combine_reg_redeems()
-               where cust_id = R4.cust_id
-               order by register_date desc
-               limit 3
-           )
- )
+             SELECT cust_id,
+                    (SELECT name FROM Customers WHERE cust_id = R4.cust_id),
+                    area_name,
+                    course_id,
+                    title,
+                    launch_date,
+                    registration_deadline,
+                    fees
+             FROM InActiveCust R4,
+                  ValidOfferings R5
+             WHERE R5.area_name IN (SELECT area_name
+                                    FROM Courses
+                                             NATURAL JOIN combine_reg_redeems()
+                                    WHERE cust_id = R4.cust_id
+                                    ORDER BY register_date DESC
+                                    LIMIT 3))
 
-select *
-from Res
-order by cust_id, registration_deadline
+SELECT *
+FROM Res
+ORDER BY cust_id, registration_deadline
 
-$$ language sql;
+$$ LANGUAGE sql;
+
+
+
+-- Q28
+CREATE OR REPLACE FUNCTION popular_courses()
+    RETURNS table
+            (
+                course_id                   int,
+                course_title                text,
+                course_area                 text,
+                num_offerings               text,
+                num_reg_for_latest_offering int
+            )
+AS
+$$
+
+WITH NumRegistered AS (SELECT course_id, launch_date, COUNT(*) AS numReg
+                       FROM combine_reg_redeems()
+                       GROUP BY course_id, launch_date),
+     ValidOfferings AS (SELECT *
+                        FROM (Offerings NATURAL JOIN NumRegistered)
+                                 NATURAL JOIN Courses
+                        WHERE (EXTRACT(YEAR FROM start_date)) = (EXTRACT(YEAR FROM CURRENT_DATE)))
+
+SELECT DISTINCT course_id,
+                title,
+                area_name,
+                (SELECT COUNT(*) FROM ValidOfferings WHERE course_id = V1.course_id),
+                numReg
+FROM ValidOfferings V1
+WHERE (SELECT COUNT(*) FROM ValidOfferings WHERE course_id = V1.course_id) >= 2
+  AND V1.start_date >= ALL (SELECT start_date FROM ValidOfferings WHERE course_id = V1.course_id)
+  AND NOT EXISTS(SELECT 1
+                 FROM ValidOfferings V2,
+                      ValidOfferings V3
+                 WHERE V2.course_id = V3.course_id
+                   AND V2.course_id = V1.course_id
+                   AND V2.start_date < V3.start_date
+                   AND V2.numReg >= V3.numReg)
+ORDER BY numReg DESC, course_id;
+
+$$ LANGUAGE sql;
