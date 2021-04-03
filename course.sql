@@ -54,7 +54,7 @@ BEGIN
     INSERT INTO Offerings VALUES (l_date, cid, reg_deadline, NULL, NULL, admin_id, 0, 0, fees);
 
     -- Adding each session in
-    FOREACH temp IN ARRAY sessions_arr
+    FOREACH temp slice 1 IN ARRAY sessions_arr
         LOOP
             s_date := temp[1]::date;
             s_time := temp[2]::time;
@@ -81,6 +81,10 @@ BEGIN
             next_sid := next_sid + 1;
 
         END LOOP;
+
+    if (seat_capacity < target_num) then
+        raise exception 'Seat capacity must at least equal to the registrations.';
+    END IF;
 
     -- Update the course offerings record after all sessions are inserted
     UPDATE Offerings
