@@ -7,19 +7,19 @@ CREATE OR REPLACE FUNCTION check_availability(IN in_eid INT, IN span int, IN cur
 DECLARE
     twelve_pm TIME := TIME '12:00';
     two_pm TIME := TIME '14:00';
-    start_time TIME := TIME '09:00';
-    end_time TIME := TIME '18:00';
+    _start_time TIME := TIME '09:00';
+    _end_time TIME := TIME '18:00';
     arr Time[] := ARRAY[]::Time[];
     one_hour interval := concat(1, ' hours')::interval;
     span_interval interval := concat(span, ' hours')::interval;
 BEGIN
-    WHILE (start_time + span_interval <= end_time) LOOP
-            IF (1 == (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
-                                                 AND NOT (start_time, start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
-                                                 AND NOT (start_time, start_time + span_interval) OVERLAPS (twelve_pm, two_pm))) THEN
-                arr = array_append(arr, start_time);
+    WHILE (_start_time + span_interval <= _end_time) LOOP
+            IF (1 = (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
+                                                 AND NOT (_start_time, _start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
+                                                 AND NOT (_start_time, _start_time + span_interval) OVERLAPS (twelve_pm, two_pm))) THEN
+                arr = array_append(arr, _start_time);
             END IF;
-            start_time := start_time + one_hour;
+            _start_time := _start_time + one_hour;
         END LOOP;
     RETURN arr;
 END;
@@ -118,12 +118,18 @@ CREATE OR REPLACE FUNCTION get_available_instructors(IN in_cid INT, IN in_start_
 DECLARE
     span int;
 BEGIN
-    SELECT duration INTO span FROM Courses WHERE Courses.course_id = cid;
+    if not exists (select 1 from Courses where course_id = in_cid) then
+        raise exception 'Course % does not exist', in_cid;
+    end if;
+
+    SELECT duration INTO span FROM Courses WHERE Courses.course_id = in_cid;
+    
+    return query
     with
         R0 AS (SELECT DISTINCT Q0.eid, Q0.name
-               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes) AS Q0
+               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN EMPLOYEES) AS Q0
         ),
-        R1 AS (SELECT s_day FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
+        R1 AS (SELECT CAST(s_day as date) FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
         R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
                FROM (R0 NATURAL JOIN Part_time_instructors CROSS JOIN R1) AS Q2
                WHERE (SELECT get_hours(Q2.eid)) + span <= 30
@@ -135,7 +141,10 @@ BEGIN
                WHERE (SELECT EXTRACT(dow FROM Q3.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q3.eid, span, Q3.s_day), 1)) <> 0
         )
-    SELECT * FROM R2 union  SELECT * FROM R3 ORDER BY (R2.eid, R2.s_day); -- not sure if correct syntax
+    SELECT * FROM R2 
+    union 
+    SELECT * FROM R3 
+    ORDER BY eid asc, s_day asc; -- not sure if correct syntax
 END;
 $$ LANGUAGE plpgsql;
 
