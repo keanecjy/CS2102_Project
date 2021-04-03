@@ -361,27 +361,17 @@ BEGIN
 
     -- Check if current_date have already past the session_date or registration deadline
     IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
-        RAISE NOTICE 'It is too late to register for this session!';
-        RETURN NULL;
+        RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
 
     -- Check if there is enough slots in the session
-    IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) >= seat_cap) THEN
-        RAISE NOTICE 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
-        RETURN NULL;
+    IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) > seat_cap) THEN
+        RAISE EXCEPTION 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
     END IF;
 
     -- Checks if customer has already registered for the session
-    IF (num_registered = 1) THEN
-        IF (TG_OP = 'INSERT') THEN
-            RAISE NOTICE 'Customer can only register for one session for a course offering';
-            RETURN NULL;
-        ELSE
-            IF (old.launch_date <> new.launch_date OR old.course_id <> new.course_id OR old.cust_id <> new.cust_id) THEN
-                RAISE NOTICE 'Customer can only register for one session for a course offering';
-                RETURN NULL;
-            END IF;
-        END IF;
+    IF (num_registered >= 2) THEN
+        raise EXCEPTION 'Customer has already registered for a session in this course offering!';
     END IF;
     RETURN new;
 END;
@@ -393,13 +383,13 @@ DROP TRIGGER IF EXISTS valid_session ON Redeems;
 DROP TRIGGER IF EXISTS valid_session ON Registers;
 
 CREATE TRIGGER valid_session
-    BEFORE INSERT OR UPDATE
+    AFTER INSERT OR UPDATE
     ON Redeems
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();
 
 CREATE TRIGGER valid_session
-    BEFORE INSERT OR UPDATE
+    AFTER INSERT OR UPDATE
     ON Registers
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();
