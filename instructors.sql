@@ -14,7 +14,7 @@ DECLARE
     span_interval interval := concat(span, ' hours')::interval;
 BEGIN
     -- IF THIS GUY HAVE SOMETHING ON THIS DAY, THEN WE ITERATE, ELSE, WE CAN ADD ALL THE DAYS POSSIBLE
-    IF (1 = (SELECT 1 FROM Session S WHERE S.eid = in_eid AND S.session_date = curr_date)) THEN
+    IF (1 = (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date)) THEN
         WHILE (_start_time + span_interval <= _end_time) LOOP
             IF (1 = (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
                 AND NOT (_start_time, _start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
