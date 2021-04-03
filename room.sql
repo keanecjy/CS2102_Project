@@ -89,9 +89,15 @@ BEGIN
                     if not exists (
                         select 1
                         from Sessions
+<<<<<<< HEAD
                         where rid = _rid
                         and session_date = _loop_date
                         and (_temp_start_hour, _temp_end_hour) overlaps (start_time, end_time)) then
+=======
+                        where rid = _rid and
+                            session_date = _loop_date and
+                            (_temp_start_hour, _temp_end_hour) overlaps (start_time, end_time)) then
+>>>>>>> 26bcb00a8a22c65dfc1f5122d3e3b1437b46023b
                         _available_hours := array_append(_available_hours, _hour);
                     end if;
                 end loop;

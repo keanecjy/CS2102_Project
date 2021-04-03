@@ -2,24 +2,35 @@
 -- Assumption is start_time is in HOURS
 -- Duration for all sessions are also in HOURS
 -- Iterates from 9am to 6pm and checks if (Start_time, start + span) violates any constraints and populate the array
-CREATE OR REPLACE FUNCTION check_availability(IN in_eid INT, IN span TIME, IN curr_date DATE)
+CREATE OR REPLACE FUNCTION check_availability(IN in_eid INT, IN span int, IN curr_date DATE)
     RETURNS TIME[] AS $$
 DECLARE
     twelve_pm TIME := TIME '12:00';
     two_pm TIME := TIME '14:00';
-    start_time TIME := TIME '09:00';
-    end_time TIME := TIME '18:00';
+    _start_time TIME := TIME '09:00';
+    _end_time TIME := TIME '18:00';
     arr Time[] := ARRAY[]::Time[];
     one_hour interval := concat(1, ' hours')::interval;
+    span_interval interval := concat(span, ' hours')::interval;
 BEGIN
-    WHILE (start_time + span <= end_time) LOOP
-            IF (1 == (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
-                                                 AND NOT (start_time, start_time + span) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
-                                                 AND NOT (start_time, start_time + span) OVERLAPS (twelve_pm, two_pm))) THEN
-                arr = array_append(arr, start_time);
+    -- IF THIS GUY HAVE SOMETHING ON THIS DAY, THEN WE ITERATE, ELSE, WE CAN ADD ALL THE DAYS POSSIBLE
+    IF (1 = (SELECT 1 FROM Session S WHERE S.eid = in_eid AND S.session_date = curr_date)) THEN
+        WHILE (_start_time + span_interval <= _end_time) LOOP
+            IF (1 = (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
+                AND NOT (_start_time, _start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
+                AND NOT (_start_time, _start_time + span_interval) OVERLAPS (twelve_pm, two_pm))) THEN
+                arr := array_append(arr, _start_time);
             END IF;
-            start_time := start_time + one_hour;
-        END LOOP;
+            _start_time := _start_time + one_hour;
+        end loop;
+    ELSE
+        WHILE (_start_time + span_interval <= _end_time) LOOP
+            IF (NOT (_start_time, _start_time + span_interval) OVERLAPS  (twelve_pm, two_pm)) THEN
+                arr = array_append(arr, _start_time);
+            END IF;
+            _start_time := _start_time + one_hour;
+        end loop;
+    END IF;
     RETURN arr;
 END;
 $$ LANGUAGE plpgsql;
@@ -51,10 +62,10 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION find_instructors(IN in_cid int, IN in_session_date date, IN in_start_hour time)
     RETURNS TABLE (eid int, name text) AS $$
 DECLARE
-    span interval;
+    span INT;
     end_hour time;
-    max_hour interval := concat(30, ' hours')::interval;
     one_hour interval := concat(1, ' hours')::interval;
+    span_interval interval;
 BEGIN
     -- validate session_date
     IF (SELECT EXTRACT(isodow FROM in_session_date) in (6, 7)) THEN
@@ -66,44 +77,43 @@ BEGIN
         RAISE EXCEPTION 'Cant a session before 9am';
     END IF;
 
-    SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = cid;
-
+    SELECT duration INTO span FROM Courses WHERE Courses.course_id = in_cid;
+    span_interval := concat(span, ' hours')::interval;
     -- validate session_date + duration
-    IF ((in_start_hour, in_start_hour + span) OVERLAPS (TIME '12:00', TIME '14:00') OR (in_start_hour + span > TIME '18:00')) THEN
+    IF ((in_start_hour, in_start_hour + span_interval) OVERLAPS (TIME '12:00', TIME '14:00') OR (in_start_hour + span_interval > TIME '18:00')) THEN
         RAISE EXCEPTION 'Invalid start time! It might have overlapped with lunch time or end work timing';
     END IF;
 
-    end_hour := in_start_hour + span;
+    end_hour := in_start_hour + span_interval;
+    return query
+        with
+            R0 as (SELECT DISTINCT Q0.eid, Q0.name
+                   FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN Employees) AS Q0
+            ),
+            R1 AS (SELECT DISTINCT Q1.eid, Q1.name
+                   FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
+                   WHERE NOT EXISTS (
+                           SELECT 1
+                           FROM Sessions S1
+                           WHERE S1.eid = Q1.eid
+                             AND (((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour) AND 
+                                    S1.session_date = in_session_date)
+                                OR (SELECT get_hours(Q1.eid)) + span > 1)
+                       )
+            ),
+            R2 AS (SELECT DISTINCT Q2.eid, Q2.name
+                   FROM (SELECT * FROM R0 NATURAL JOIN Full_time_instructors) AS Q2
+                   WHERE NOT EXISTS(
+                           SELECT 1
+                           FROM Sessions S1
+                           WHERE S1.session_date = in_session_date
+                             AND S1.eid = Q2.eid
+                             AND (in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
+                       )
+            )
 
-    with
-        R0 as (SELECT DISTINCT Q0.eid, Q0.name
-               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes) AS Q0
-        ),
-        R1 AS (SELECT DISTINCT Q1.eid, Q1.name
-               FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
-               WHERE NOT EXISTS (
-                       SELECT 1
-                       FROM Sessions S1
-                       WHERE S1.session_date = in_session_date
-                         AND S1.eid = Q1.eid
-                         AND ((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
-                           OR
-                              (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - start_hour) > max_hour
-                           )
-                   )
-        ),
-        R2 AS (SELECT DISTINCT Q2.eid, Q2.name
-               FROM (SELECT * FROM R0 NATURAL JOIN Full_time_instructors) AS Q2
-               WHERE NOT EXISTS(
-                       SELECT 1
-                       FROM Sessions S1
-                       WHERE S1.session_date = in_session_date
-                         AND S1.eid = Q2.eid
-                         AND (in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
-                   )
-        )
-    SELECT * from R1 union SELECT * from R2;
-END;
+            SELECT * from R1 union SELECT * from R2;
+    END;
 $$ LANGUAGE plpgsql;
 
 
@@ -116,19 +126,23 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION get_available_instructors(IN in_cid INT, IN in_start_date date, IN in_end_date date)
     RETURNS TABLE (eid INT, name TEXT, hours INT, day date, available_hours Time[]) AS $$
 DECLARE
-    max_hour interval;
-    span interval;
+    span int;
 BEGIN
-    SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = cid;
-    max_hour := concat(30, ' hours')::interval;
+    if not exists (select 1 from Courses where course_id = in_cid) then
+        raise exception 'Course % does not exist', in_cid;
+    end if;
+
+    SELECT duration INTO span FROM Courses WHERE Courses.course_id = in_cid;
+    
+    return query
     with
         R0 AS (SELECT DISTINCT Q0.eid, Q0.name
-               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes) AS Q0
+               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN EMPLOYEES) AS Q0
         ),
-        R1 AS (SELECT s_day FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
+        R1 AS (SELECT CAST(s_day as date) FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
         R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
                FROM (R0 NATURAL JOIN Part_time_instructors CROSS JOIN R1) AS Q2
-               WHERE (concat((SELECT get_hours(Q2.eid)), ' hours')::interval) + span <= max_hour
+               WHERE (SELECT get_hours(Q2.eid)) + span <= 30
                  AND (SELECT EXTRACT(dow FROM Q2.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q2.eid, span, Q2.s_day), 1)) <> 0
         ),
@@ -137,7 +151,10 @@ BEGIN
                WHERE (SELECT EXTRACT(dow FROM Q3.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q3.eid, span, Q3.s_day), 1)) <> 0
         )
-    SELECT * FROM R2 union  SELECT * FROM R3 ORDER BY (R2.eid, R2.s_day); -- not sure if correct syntax
+    SELECT * FROM R2 
+    union 
+    SELECT * FROM R3 
+    ORDER BY eid asc, s_day asc; -- not sure if correct syntax
 END;
 $$ LANGUAGE plpgsql;
 

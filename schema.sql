@@ -162,15 +162,6 @@ CREATE TABLE Offerings
     CONSTRAINT non_negative_fees check (fees >= 0)
 );
 
--- TODO: Trigger - start date and end date of Offerings is updated to the earliest and latest session_date
--- TODO: Trigger - each instructor at most one course session at any hour
--- TODO: Trigger - each instructor must not teach 2 consecutive sessions (1 hr break)
--- TODO: Trigger - each part-time instructor total hours per month <= 30
--- TODO: Trigger - the assigned instructor must specialise in that course_area
--- TODO: Trigger - update seating_capacity in Offerings to sum of seating capacities of sessions
--- TODO: Trigger - Each room can be used to conduct at most one course session at any time
--- TODO: Trigger - This constraint have to be in trigger as subquery not allowed in check
---
 -- NOTE: eid refers to instructors of the session
 CREATE TABLE Sessions
 (
@@ -266,9 +257,6 @@ CREATE TABLE Buys
     CONSTRAINT non_negative_redemptions check (num_remaining_redemptions >= 0)
 );
 
--- TODO (DONE?): TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
--- TODO (DONE): TRIGGER - course offering is said to be available if the number of registrations received is no more
---  than its seating capacity; otherwise, we say that a course offering is fully booked.
 -- NOTE: card_number not included as an attribute
 CREATE TABLE Redeems
 (
@@ -291,9 +279,6 @@ CREATE TABLE Redeems
     CONSTRAINT purchase_package_before_redeem check (buy_date <= redeem_date)
 );
 
--- TODO (DONE): TRIGGER - For each course offered by the company, a customer can register for at most one of its sessions before its registration deadline.
--- TODO (DONE): TRIGGER - course offering is said to be available if the number of registrations received is no more
---  than its seating capacity; otherwise, we say that a course offering is fully booked.
 -- NOTE: card_number not part of pri key
 CREATE TABLE Registers
 (
