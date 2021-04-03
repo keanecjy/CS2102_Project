@@ -1,5 +1,4 @@
-CREATE OR REPLACE PROCEDURE register_session(cus_id INT, in_cid INT, date_of_launch DATE, session_number INT, in_card_number TEXT,
-                                             in_buy_date DATE, in_pid INT, pay_method TEXT)
+CREATE OR REPLACE PROCEDURE register_session(cus_id INT, in_cid INT, date_of_launch DATE, session_number INT, pay_method TEXT)
 AS $$
 DECLARE
     deadline Date;
@@ -7,6 +6,10 @@ DECLARE
     capacity INT;
     num_reg INT;
     num_redeem INT;
+    pid int;
+    num_card TEXT;
+    date_of_buy DATE;
+    num_remaining_reg INT;
 BEGIN
     /*
      * 1) Check if current_date have already past the session_date itself
@@ -53,22 +56,24 @@ BEGIN
         RAISE EXCEPTION 'This session course is already full!';
     END IF;
 
-    IF (pay_method = 'redeem' AND in_buy_date IS NOT NULL AND in_pid IS NOT NULL) THEN
-        IF ((SELECT num_remaining_redemptions FROM Buys B WHERE B.buy_date = in_buy_date AND B.cust_id = cus_id AND B.package_id = in_pid) = 0) THEN
-            RAISE EXCEPTION 'This course package has used up all its available free redeems';
+    IF (pay_method = 'redeem') THEN
+        
+        SELECT num_remaining_redemptions, buy_date, package_id INTO num_remaining_reg, date_of_buy, pid FROM Buys B WHERE B.cust_id = cus_id;
+        IF (num_remaining_reg = 0) THEN
+            RAISE EXCEPTION 'Hi Customer %, your course package has used up all its available free redeems', cus_id;
         END IF;
 
-        INSERT INTO Redeems VALUES (current_date, in_buy_date, cus_id, in_pid, session_number, date_of_launch, in_cid);
+        INSERT INTO Redeems VALUES (current_date, date_of_buy, cus_id, pid, session_number, date_of_launch, in_cid);
 
         -- decrement the num of remaining redemptions for that particular package
         UPDATE Buys B
         SET num_remaining_redemptions = num_remaining_redemptions - 1
-        WHERE B.buy_date = in_buy_date
-          AND B.cust_id = cus_id
-          AND B.package_id = in_pid;
+        WHERE B.cust_id = cus_id
 
-    ELSIF (pay_method = 'card' AND in_card_number IS NOT NULL) THEN
-        INSERT INTO Registers VALUES (current_date, cus_id, in_card_number, session_number, date_of_launch, in_cid);
+    ELSIF (pay_method = 'card') THEN
+        SELECT card_number INTO num_card FROM get_active_card(cus_id);
+        
+        INSERT INTO Registers VALUES (current_date, cus_id, num_card, session_number, date_of_launch, in_cid);
     ELSE
         RAISE EXCEPTION 'INVALID PAYMENT METHOD';
     END IF;
