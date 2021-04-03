@@ -229,7 +229,7 @@ BEGIN
     ELSE
         UPDATE Registers
         SET sid         = new_sid,
-            redeem_date = CURRENT_DATE
+            register_date = CURRENT_DATE
         WHERE cust_id = customer_id
           AND course_id = cid
           AND launch_date = date_launch;
