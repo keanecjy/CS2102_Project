@@ -130,9 +130,9 @@ $$ LANGUAGE sql;
 
 
 -- Helper function to query the num of registrations for the session
-CREATE OR REPLACE FUNCTION get_num_registration_for_session(session_id int, date_launch date, cid int) RETURNS int AS
+CREATE OR REPLACE FUNCTION get_num_registration_for_session(session_id int, date_launch date, cid int) RETURNS bigint AS
 $$
-SELECT COUNT(*)
+SELECT COALESCE(COUNT(*), 1)
 FROM combine_reg_redeems()
 WHERE sid = session_id
   AND launch_date = date_launch
@@ -152,7 +152,7 @@ CREATE OR REPLACE FUNCTION get_available_course_offerings()
                 end_date              date,
                 registration_deadline date,
                 fees                  float,
-                remaining_seats       int
+                remaining_seats       bigint
             )
 AS
 $$
@@ -178,7 +178,7 @@ CREATE OR REPLACE FUNCTION get_available_course_sessions(cid int, date_of_launch
                 session_date    date,
                 start_time      time,
                 inst_name       text,
-                remaining_seats int
+                remaining_seats bigint
             )
 AS
 $$
@@ -309,8 +309,8 @@ CREATE OR REPLACE FUNCTION popular_courses()
                 course_id                   int,
                 course_title                text,
                 course_area                 text,
-                num_offerings               text,
-                num_reg_for_latest_offering int
+                num_offerings               bigint,
+                num_reg_for_latest_offering bigint
             )
 AS
 $$
