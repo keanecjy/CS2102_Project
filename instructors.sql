@@ -75,35 +75,37 @@ BEGIN
 
     end_hour := in_start_hour + span;
 
-    with
-        R0 as (SELECT DISTINCT Q0.eid, Q0.name
-               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN Employees) AS Q0
-        ),
-        R1 AS (SELECT DISTINCT Q1.eid, Q1.name
-               FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
-               WHERE NOT EXISTS (
-                       SELECT 1
-                       FROM Sessions S1
-                       WHERE S1.session_date = in_session_date
-                         AND S1.eid = Q1.eid
-                         AND ((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
-                           OR
-                              (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - in_start_hour) > max_hour
-                           )
-                   )
-        ),
-        R2 AS (SELECT DISTINCT Q2.eid, Q2.name
-               FROM (SELECT * FROM R0 NATURAL JOIN Full_time_instructors) AS Q2
-               WHERE NOT EXISTS(
-                       SELECT 1
-                       FROM Sessions S1
-                       WHERE S1.session_date = in_session_date
-                         AND S1.eid = Q2.eid
-                         AND (in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
-                   )
-        )
-    SELECT * from R1 union SELECT * from R2;
-END;
+    return query
+        with
+            R0 as (SELECT DISTINCT Q0.eid, Q0.name
+                   FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN Employees) AS Q0
+            ),
+            R1 AS (SELECT DISTINCT Q1.eid, Q1.name
+                   FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
+                   WHERE NOT EXISTS (
+                           SELECT 1
+                           FROM Sessions S1
+                           WHERE S1.session_date = in_session_date
+                             AND S1.eid = Q1.eid
+                             AND ((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
+                               OR
+                                  (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - in_start_hour) > max_hour
+                               )
+                       )
+            ),
+            R2 AS (SELECT DISTINCT Q2.eid, Q2.name
+                   FROM (SELECT * FROM R0 NATURAL JOIN Full_time_instructors) AS Q2
+                   WHERE NOT EXISTS(
+                           SELECT 1
+                           FROM Sessions S1
+                           WHERE S1.session_date = in_session_date
+                             AND S1.eid = Q2.eid
+                             AND (in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
+                       )
+            )
+
+            SELECT * from R1 union SELECT * from R2;
+    END;
 $$ LANGUAGE plpgsql;
 
 
