@@ -3,7 +3,7 @@ CREATE OR REPLACE PROCEDURE register_session(cus_id INT, in_cid INT, date_of_lau
 AS $$
 DECLARE
     deadline Date;
-    session_date Date;
+    date_of_session Date;
     capacity INT;
     num_reg INT;
     num_redeem INT;
@@ -27,13 +27,13 @@ BEGIN
         RAISE EXCEPTION 'The registration deadline for this course have already have passed!';
     END IF;
 
-    SELECT S.session_date INTO session_date
+    SELECT S.session_date INTO date_of_session
     FROM Sessions S
     WHERE launch_date = date_of_launch
       AND course_id = in_cid
       AND S.sid = session_number;
 
-    IF (current_date > session_date) THEN
+    IF (current_date > date_of_session) THEN
         RAISE EXCEPTION 'This session have already passed, you cant register for it';
     END IF;
 
@@ -80,13 +80,13 @@ AS $$
 DECLARE
     sid_register INT;
     sid_redeem INT;
-    session_date DATE;
-    buy_date DATE;
+    date_of_session DATE;
+    date_of_buy DATE;
     pid INT;
 BEGIN
     -- we know that for a course, that customer only have 1 session
     -- if cancelled at least 7 days before the day of registered sessions, will have to credit an extra course session to customer 
-    SELECT R.sid, R.buy_date, R.package_id INTO sid_redeem, buy_date, pid
+    SELECT R.sid, R.buy_date, R.package_id INTO sid_redeem, date_of_buy, pid
     FROM Redeems R
     WHERE R.cust_id = cus_id
       AND R.course_id = in_cid
@@ -105,16 +105,16 @@ BEGIN
 
     IF (sid_redeem IS NOT NULL) THEN
         -- DELETE FROM redeems
-        SELECT S.session_date INTO session_date
+        SELECT S.session_date INTO date_of_session
         FROM Sessions S
         WHERE S.sid = sid_redeem
           AND S.course_id = in_cid
           AND S.launch_date = date_of_launch;
 
-        IF ((SELECT (session_date - current_date) AS days) >= 7) THEN
+        IF ((SELECT (date_of_session - current_date) AS days) >= 7) THEN
             UPDATE Buys B
             SET num_remaining_redemptions = num_remaining_redemptions + 1
-            WHERE B.buy_date = buy_date
+            WHERE B.buy_date = date_of_buy
               AND B.cust_id = cus_id
               AND B.package_id = pid;
         END IF;
