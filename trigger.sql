@@ -148,15 +148,14 @@ FOR EACH ROW EXECUTE FUNCTION instructors_specialization_checks();
 CREATE OR REPLACE FUNCTION instructors_part_time_duration_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    span interval;
-    max_hour interval := concat(30, ' hours')::interval;
+    span int;
 BEGIN
-    SELECT DISTINCT concat(duration, ' hours')::interval INTO span
+    SELECT duration into span
     FROM Courses
     WHERE course_id = NEW.course_id;
 
     -- VALIDATE PART-TIME INSTRUCTOR
-    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((concat((SELECT get_hours(NEW.eid)), ' hours')::interval) + span > max_hour)) THEN
+    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((SELECT get_hours(NEW.eid)) + span > 30)) THEN
         RAISE EXCEPTION 'This part-time instructor is going to be OVERWORKED if he take this session!';
         RETURN NULL;
     END IF;
@@ -175,9 +174,8 @@ FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
 CREATE OR REPLACE FUNCTION instructors_overlap_timing_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    one_hour interval;
+    one_hour interval := concat(1, ' hours')::interval;
 BEGIN
-    one_hour := concat(1, ' hours')::interval;
     -- VALIDATE AT MOST ONE COURSE SESSION AT ANY HOUR AND NOT TEACH 2 CONSECUTIVE SESSIONS
     IF (EXISTS(SELECT 1 FROM Sessions S WHERE S.session_date = NEW.session_date AND S.eid = NEW.eid
                                           AND (NEW.start_time, NEW.end_time) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour))) THEN
@@ -352,12 +350,14 @@ BEGIN
     INTO num_registered
     FROM Redeems
     WHERE new.launch_date = launch_date
-      AND new.course_id = course_id;
+      AND new.course_id = course_id
+      AND new.cust_id = cust_id;
 
     num_registered := num_registered + (SELECT COUNT(*)
                                         FROM Registers
                                         WHERE new.launch_date = launch_date
-                                          AND new.course_id = course_id);
+                                          AND new.course_id = course_id
+                                          AND new.cust_id = cust_id);
 
     -- Check if current_date have already past the session_date or registration deadline
     IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
