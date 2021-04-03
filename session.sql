@@ -9,7 +9,7 @@
 -- TODO: Trigger - Each room can be used to conduct at most one course session at any time (CONSTRAINT TYPE) (Done) (in room_availability_checks)
 -- TODO: Trigger - New sessions added should not collide with lunch time or start or end timing (IN new_session_timing_collision_checks)
 -- TODO: Trigger - Course offering have to exist first before adding session (in course_offering_exists)
-CREATE OR REPLACE PROCEDURE add_session(cid INT, date_of_launch DATE, session_number INT, session_date DATE, start_hour TIME, eid INT, rid INT)
+CREATE OR REPLACE PROCEDURE add_session(in_cid INT, date_of_launch DATE, session_number INT, in_session_date DATE, in_start_hour TIME, in_eid INT, in_rid INT)
 AS $$
 DECLARE
     course_deadline DATE;
@@ -20,7 +20,7 @@ DECLARE
 BEGIN
     SELECT DISTINCT registration_deadline, duration INTO course_deadline, span
     FROM Offerings
-    WHERE course_id = cid
+    WHERE course_id = in_cid
       AND launch_date = date_of_launch;
 
     IF (current_date > course_deadline) THEN
@@ -28,28 +28,28 @@ BEGIN
     END IF;
 
     -- check and enforce that the sid being inserted is in increasing order
-    SELECT MAX(sid) INTO max_sid From Sessions S WHERE S.cid = cid AND S.launch_date = date_of_launch;
+    SELECT MAX(sid) INTO max_sid From Sessions S WHERE S.cid = in_cid AND S.launch_date = date_of_launch;
     IF (session_number <= max_sid) THEN
         RAISE EXCEPTION 'Sid is not in increasing order';
     END IF;
 
-    INSERT INTO Sessions VALUES (session_number, date_of_launch, cid, session_date, start_hour, start_hour + span, rid, eid);
+    INSERT INTO Sessions VALUES (session_number, date_of_launch, in_cid, in_session_date, in_start_hour, in_start_hour + span, in_rid, in_eid);
 
     -- find the maxs and min of the session_date from that particular offering
     SELECT min(session_date), max(session_date) INTO min_date, max_date
     FROM Sessions S
-    WHERE S.course_id = cid
+    WHERE S.course_id = in_cid
       AND S.launch_date = date_of_launch;
 
     -- updates the start and end date of Offerings
     UPDATE Offerings
     SET start_date = min_date
-    WHERE course_id = cid
+    WHERE course_id = in_cid
       AND launch_date = date_of_launch;
 
     UPDATE Offerings
     SET end_date = max_date
-    WHERE course_id = cid
+    WHERE course_id = in_cid
       AND launch_date = date_of_launch;
 
     -- updates the seating_capacity in Offerings to sum of seating capacity of sessions
@@ -57,14 +57,14 @@ BEGIN
     SET seating_capacity = (
         SELECT SUM(Q1.seating_capacity)
         FROM (Rooms NATURAL JOIN Sessions) AS Q1
-        WHERE Q1.course_id = cid
+        WHERE Q1.course_id = in_cid
           AND Q1.launch_date = date_of_launch)
-    WHERE course_id = cid
+    WHERE course_id = in_cid
       AND launch_date = date_of_launch;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE remove_session(cid INT, date_of_launch DATE, sid INT)
+CREATE OR REPLACE PROCEDURE remove_session(in_cid INT, date_of_launch DATE, in_sid INT)
 AS $$
 DECLARE
     session_date DATE;
@@ -74,34 +74,34 @@ DECLARE
     second_smallest_date DATE;
     second_largest_date DATE;
 BEGIN
-    SELECT DISTINCT S.session_date into session_date FROM Session S where S.sid = sid and S.cid = cid and S.launch_date = date_of_launch;
+    SELECT DISTINCT S.session_date into session_date FROM Session S where S.sid = in_sid and S.cid = in_cid and S.launch_date = date_of_launch;
     IF (session_date <= current_date) THEN
         RAISE EXCEPTION 'Course session has already started';
     END IF;
 
-    IF (NOT EXISTS (SELECT 1 FROM Sessions S WHERE S.cid = cid AND S.sid = sid AND S.launch_date = date_of_launch)) THEN
+    IF (NOT EXISTS (SELECT 1 FROM Sessions S WHERE S.cid = in_cid AND S.sid = in_sid AND S.launch_date = date_of_launch)) THEN
         RAISE EXCEPTION 'NO SUCH SESSION TO DELETE';
     END IF;
 
     -- deletes
     DELETE FROM Sessions S
-    WHERE S.cid = cid
-      AND S.sid = sid
+    WHERE S.cid = in_cid
+      AND S.sid = in_sid
       AND S.launch_date = date_of_launch
     RETURNING S.rid INTO room_id;
 
     -- updates the start and end date of offerings
     SELECT O.start_date, O.end_date INTO start_date, end_date
-    FROM Offerings
-    WHERE course_id = cid
+    FROM Offerings O
+    WHERE course_id = in_cid
       AND launch_date = date_of_launch;
 
     IF (session_date = start_date) THEN
         SELECT S.session_date into second_smallest_date
         FROM Sessions S
-        WHERE S.sid = sid
+        WHERE S.sid = in_sid
           AND S.launch_date = date_of_launch
-          AND S.cid = cid
+          AND S.cid = in_cid
         ORDER BY S.session_date
         OFFSET 1
             LIMIT 1;
@@ -109,15 +109,15 @@ BEGIN
         UPDATE Offerings
         SET start_date = second_smallest_date
         WHERE launch_date = date_of_launch
-          AND course_id = cid;
+          AND course_id = in_cid;
     END IF;
 
     IF (session_date = end_date) THEN
         SELECT S.session_date into second_largest_date
         FROM Sessions S
-        WHERE S.sid = sid
+        WHERE S.sid = in_sid
           AND S.launch_date = date_of_launch
-          AND S.cid = cid
+          AND S.cid = in_cid
         ORDER BY S.Session_date DESC
         OFFSET 1
             LIMIT 1;
@@ -125,13 +125,13 @@ BEGIN
         UPDATE Offerings
         SET end_date = second_largest_date
         WHERE launch_date = date_of_launch
-          AND course_id = cid;
+          AND course_id = in_cid;
     END IF;
 
     -- updates the seating_capacity in offering.
     UPDATE Offerings
     SET seating_capacity = seating_capacity - (SELECT R.seating_capacity from Rooms R WHERE R.rid = room_id)
     WHERE launch_date = date_of_launch
-      AND course_id = cid;
+      AND course_id = in_cid;
 END;
 $$ LANGUAGE plpgsql;

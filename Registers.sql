@@ -1,5 +1,5 @@
-CREATE OR REPLACE PROCEDURE register_session(cus_id INT, cid INT, date_of_launch DATE, session_number INT, card_number TEXT,
-                                             buy_date DATE, pid INT, pay_method TEXT)
+CREATE OR REPLACE PROCEDURE register_session(cus_id INT, in_cid INT, date_of_launch DATE, session_number INT, in_card_number TEXT,
+                                             in_buy_date DATE, in_pid INT, pay_method TEXT)
 AS $$
 DECLARE
     deadline Date;
@@ -21,7 +21,7 @@ BEGIN
     SELECT registration_deadline, seating_capacity INTO deadline, capacity
     FROM Offerings
     WHERE launch_date = date_of_launch
-      AND course_id = cid;
+      AND course_id = in_cid;
 
     IF (current_date > deadline) THEN
         RAISE EXCEPTION 'The registration deadline for this course have already have passed!';
@@ -30,7 +30,7 @@ BEGIN
     SELECT S.session_date INTO session_date
     FROM Sessions S
     WHERE launch_date = date_of_launch
-      AND course_id = cid
+      AND course_id = in_cid
       AND S.sid = session_number;
 
     IF (current_date > session_date) THEN
@@ -41,41 +41,41 @@ BEGIN
     FROM Registers R
     WHERE R.sid = session_number
       AND R.launch_date = date_of_launch
-      AND R.course_id = cid;
+      AND R.course_id = in_cid;
 
     SELECT COUNT(*) INTO num_redeem
     FROM Redeems R
     WHERE R.sid = session_number
       AND R.launch_date = date_of_launch
-      AND R.course_id = cid;
+      AND R.course_id = in_cid;
 
     IF (num_reg + num_redeem + 1 > capacity) THEN
         RAISE EXCEPTION 'This session course is already full!';
     END IF;
 
-    IF (pay_method = 'redeem' AND buy_date IS NOT NULL AND pid IS NOT NULL) THEN
-        IF ((SELECT num_remaining_redemptions FROM Buys B WHERE B.buy_date = buy_date AND B.cust_id = cus_id AND B.package_id = pid) = 0) THEN
+    IF (pay_method = 'redeem' AND in_buy_date IS NOT NULL AND in_pid IS NOT NULL) THEN
+        IF ((SELECT num_remaining_redemptions FROM Buys B WHERE B.buy_date = in_buy_date AND B.cust_id = cus_id AND B.package_id = in_pid) = 0) THEN
             RAISE EXCEPTION 'This course package has used up all its available free redeems';
         END IF;
 
-        INSERT INTO Redeems VALUES (current_date, buy_date, cus_id, pid, session_number, date_of_launch, cid);
+        INSERT INTO Redeems VALUES (current_date, in_buy_date, cus_id, in_pid, session_number, date_of_launch, in_cid);
 
         -- decrement the num of remaining redemptions for that particular package
         UPDATE Buys B
         SET num_remaining_redemptions = num_remaining_redemptions - 1
-        WHERE B.buy_date = buy_date
+        WHERE B.buy_date = in_buy_date
           AND B.cust_id = cus_id
-          AND B.package_id = pid;
+          AND B.package_id = in_pid;
 
-    ELSIF (pay_method = 'card' AND card_number IS NOT NULL) THEN
-        INSERT INTO Registers VALUES (current_date, cus_id, card_number, session_number, date_of_launch, cid);
+    ELSIF (pay_method = 'card' AND in_card_number IS NOT NULL) THEN
+        INSERT INTO Registers VALUES (current_date, cus_id, in_card_number, session_number, date_of_launch, in_cid);
     ELSE
         RAISE EXCEPTION 'INVALID PAYMENT METHOD';
     END IF;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE cancel_registration(cus_id INT, cid INT, date_of_launch DATE)
+CREATE OR REPLACE PROCEDURE cancel_registration(cus_id INT, in_cid INT, date_of_launch DATE)
 AS $$
 DECLARE
     sid_register INT;
@@ -89,13 +89,13 @@ BEGIN
     SELECT R.sid, R.buy_date, R.package_id INTO sid_redeem, buy_date, pid
     FROM Redeems R
     WHERE R.cust_id = cus_id
-      AND R.course_id = cid
+      AND R.course_id = in_cid
       AND R.launch_date = date_of_launch;
 
     SELECT R.sid INTO sid_register
     FROM Registers R
     WHERE R.cust_id = cus_id
-      AND R.course_id = cid
+      AND R.course_id = in_cid
       AND R.launch_date = date_of_launch;
 
     IF (sid_redeem IS NULL AND sid_register IS NULL) THEN
@@ -107,8 +107,8 @@ BEGIN
         -- DELETE FROM redeems
         SELECT S.session_date INTO session_date
         FROM Sessions S
-        WHERE S.sid = sid
-          AND S.course_id = cid
+        WHERE S.sid = sid_redeem
+          AND S.course_id = in_cid
           AND S.launch_date = date_of_launch;
 
         IF ((SELECT (session_date - current_date) AS days) >= 7) THEN
@@ -121,13 +121,13 @@ BEGIN
 
         DELETE FROM Redeems R
         WHERE R.cust_id = cus_id
-          AND R.course_id = cid
+          AND R.course_id = in_cid
           AND R.launch_date = date_of_launch;
     ELSE
         -- DELETE FROM registers
         DELETE FROM Registers R
         WHERE R.cust_id = cus_id
-          AND R.course_id = cid
+          AND R.course_id = in_cid
           AND R.launch_date = date_of_launch;
     END IF;
 END;
