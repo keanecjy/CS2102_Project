@@ -67,15 +67,15 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE PROCEDURE remove_session(in_cid INT, date_of_launch DATE, in_sid INT)
 AS $$
 DECLARE
-    session_date DATE;
+    date_of_session DATE;
     room_id INT;
-    start_date DATE;
-    end_date DATE;
+    date_of_start DATE;
+    date_of_end DATE;
     second_smallest_date DATE;
     second_largest_date DATE;
 BEGIN
-    SELECT DISTINCT S.session_date into session_date FROM Session S where S.sid = in_sid and S.cid = in_cid and S.launch_date = date_of_launch;
-    IF (session_date <= current_date) THEN
+    SELECT DISTINCT S.session_date into date_of_session FROM Session S where S.sid = in_sid and S.cid = in_cid and S.launch_date = date_of_launch;
+    IF (date_of_session <= current_date) THEN
         RAISE EXCEPTION 'Course session has already started';
     END IF;
 
@@ -91,12 +91,12 @@ BEGIN
     RETURNING S.rid INTO room_id;
 
     -- updates the start and end date of offerings
-    SELECT O.start_date, O.end_date INTO start_date, end_date
+    SELECT O.start_date, O.end_date INTO date_of_start, date_of_end
     FROM Offerings O
     WHERE course_id = in_cid
       AND launch_date = date_of_launch;
 
-    IF (session_date = start_date) THEN
+    IF (date_of_session = date_of_start) THEN
         SELECT S.session_date into second_smallest_date
         FROM Sessions S
         WHERE S.sid = in_sid
@@ -112,7 +112,7 @@ BEGIN
           AND course_id = in_cid;
     END IF;
 
-    IF (session_date = end_date) THEN
+    IF (date_of_session = date_of_end) THEN
         SELECT S.session_date into second_largest_date
         FROM Sessions S
         WHERE S.sid = in_sid
