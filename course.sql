@@ -115,6 +115,50 @@ END;
 
 $$ language plpgsql;
 
+
+-- Helper function to create table containing all registers and redeems
+create or replace function combine_reg_redeems()
+    returns table
+            (
+                cust_id       int,
+                sid           int,
+                launch_date   date,
+                course_id     int,
+                register_date date
+            )
+AS
+$$
+
+select cust_id, sid, launch_date, course_id, register_date
+from Registers
+union
+select cust_id, sid, launch_date, course_id, redeem_date
+from Redeems;
+
+$$ language sql;
+
+-- -- Helper function to query the num of registrations for the offering
+-- create or replace function get_num_registration_for_offering(cid int, date_launch date)
+--     returns int AS
+-- $$
+-- select count(*)
+-- from combine_reg_redeems()
+-- where launch_date = date_launch
+--   and course_id = cid;
+-- $$ language sql;
+
+
+-- Helper function to query the num of registrations for the session
+create or replace function get_num_registration_for_session(session_id int, date_launch date, cid int)
+    returns int AS
+$$
+select count(*)
+from combine_reg_redeems()
+where sid = session_id
+  and launch_date = date_launch
+  and course_id = cid;
+$$ language sql;
+
 -- Q15
 -- Retrieves all course offerings that can be registered
 -- Output is sorted in ascending order of registration deadline and course title.
@@ -134,7 +178,7 @@ AS
 $$
 with NumRegistered as (
     select course_id, launch_date, count(*) as numReg
-    from ((select course_id, launch_date from Registers) union all (select course_id, launch_date from Redeems)) R
+    from combine_reg_redeems()
     group by course_id, launch_date
 )
 
@@ -179,20 +223,6 @@ $$ language sql;
 
 
 
--- Helper function to query the num of registrations for the session
-create or replace function get_num_registration_for_session(session_id int, date_launch date, cid int)
-    returns int AS
-$$
-select count(*)
-from ((select sid, launch_date, course_id from Redeems)
-      union all
-      (select sid, launch_date, course_id from Registers)) R
-where sid = session_id
-  and launch_date = date_launch
-  and course_id = cid;
-$$ language sql;
-
-
 /*
 Q19
 1. Check for seat availability is done by trigger
@@ -228,3 +258,90 @@ BEGIN
 END;
 $$ language plpgsql;
 
+
+/*
+1. Check for inactive customers
+2. For each inactive customer, find:
+	- Course area A, whereby at least one of the three most recent course offerings are in A
+	- If customer has not registered for any course offerings, every course area is of interest.
+	-
+*/
+create or replace function promote_courses()
+    returns table
+            (
+                cust_id      int,
+                cust_name    text,
+                course_area  text,
+                course_id    int,
+                course_title text,
+                launch_date  date,
+                reg_deadline date,
+                fees         float
+            )
+AS
+$$
+with InActiveCust as (
+    select cust_id
+    from Customers
+             natural join combine_reg_redeems()
+    group by cust_id
+    having max(register_date) + interval '5 months' < date_trunc('month', current_date)
+),
+ CustWithNoOfferings as (
+     select cust_id, name
+     from Customers
+     where cust_id not in (select cust_id from combine_reg_redeems())
+ ),
+ NumRegistered as (
+     select course_id, launch_date, count(*) as numReg
+     from combine_reg_redeems()
+     group by course_id, launch_date
+ ),
+ ValidOfferings as (
+     select *
+     from (Offerings natural left join NumRegistered)
+              natural join Courses
+     where registration_deadline >= current_date
+       and seating_capacity - coalesce(numReg, 0) > 0
+ ),
+ Res as (
+     select cust_id,
+            name,
+            area_name,
+            course_id,
+            title,
+            launch_date,
+            registration_deadline,
+            fees
+     from (CustWithNoOfferings
+              natural join Customers),
+          ValidOfferings
+
+     union
+
+     select cust_id,
+            (select name from Customers where cust_id = R4.cust_id),
+            area_name,
+            course_id,
+            title,
+            launch_date,
+            registration_deadline,
+            fees
+     from InActiveCust R4,
+          ValidOfferings R5
+     where R5.area_name
+               in (
+               select area_name
+               from Courses
+                        natural join combine_reg_redeems()
+               where cust_id = R4.cust_id
+               order by register_date desc
+               limit 3
+           )
+ )
+
+select *
+from Res
+order by cust_id, registration_deadline
+
+$$ language sql;
