@@ -77,7 +77,7 @@ BEGIN
 
     with
         R0 as (SELECT DISTINCT Q0.eid, Q0.name
-               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes) AS Q0
+               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN Employees) AS Q0
         ),
         R1 AS (SELECT DISTINCT Q1.eid, Q1.name
                FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
@@ -88,7 +88,7 @@ BEGIN
                          AND S1.eid = Q1.eid
                          AND ((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
                            OR
-                              (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - start_hour) > max_hour
+                              (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - in_start_hour) > max_hour
                            )
                    )
         ),
