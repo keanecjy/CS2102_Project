@@ -2,7 +2,7 @@
 -- Assumption is start_time is in HOURS
 -- Duration for all sessions are also in HOURS
 -- Iterates from 9am to 6pm and checks if (Start_time, start + span) violates any constraints and populate the array
-CREATE OR REPLACE FUNCTION check_availability(IN in_eid INT, IN span TIME, IN curr_date DATE)
+CREATE OR REPLACE FUNCTION check_availability(IN in_eid INT, IN span int, IN curr_date DATE)
     RETURNS TIME[] AS $$
 DECLARE
     twelve_pm TIME := TIME '12:00';
@@ -11,11 +11,12 @@ DECLARE
     end_time TIME := TIME '18:00';
     arr Time[] := ARRAY[]::Time[];
     one_hour interval := concat(1, ' hours')::interval;
+    span_interval : interval := concat(span, ' hours')::interval;
 BEGIN
-    WHILE (start_time + span <= end_time) LOOP
+    WHILE (start_time + span_interval <= end_time) LOOP
             IF (1 == (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
-                                                 AND NOT (start_time, start_time + span) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
-                                                 AND NOT (start_time, start_time + span) OVERLAPS (twelve_pm, two_pm))) THEN
+                                                 AND NOT (start_time, start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
+                                                 AND NOT (start_time, start_time + span_interval) OVERLAPS (twelve_pm, two_pm))) THEN
                 arr = array_append(arr, start_time);
             END IF;
             start_time := start_time + one_hour;
@@ -53,8 +54,8 @@ CREATE OR REPLACE FUNCTION find_instructors(IN in_cid int, IN in_session_date da
 DECLARE
     span INT;
     end_hour time;
-    max_hour interval := concat(30, ' hours')::interval;
     one_hour interval := concat(1, ' hours')::interval;
+    span_interval interval;
 BEGIN
     -- validate session_date
     IF (SELECT EXTRACT(isodow FROM in_session_date) in (6, 7)) THEN
@@ -67,13 +68,13 @@ BEGIN
     END IF;
 
     SELECT duration INTO span FROM Courses WHERE Courses.course_id = in_cid;
-
+    span_interval := concat(span, ' hours')::interval;
     -- validate session_date + duration
-    IF ((in_start_hour, in_start_hour + span) OVERLAPS (TIME '12:00', TIME '14:00') OR (in_start_hour + span > TIME '18:00')) THEN
+    IF ((in_start_hour, in_start_hour + span_interval) OVERLAPS (TIME '12:00', TIME '14:00') OR (in_start_hour + span_interval > TIME '18:00')) THEN
         RAISE EXCEPTION 'Invalid start time! It might have overlapped with lunch time or end work timing';
     END IF;
 
-    end_hour := in_start_hour + span;
+    end_hour := in_start_hour + span_interval;
 
     return query
         with
@@ -88,9 +89,7 @@ BEGIN
                            WHERE S1.session_date = in_session_date
                              AND S1.eid = Q1.eid
                              AND ((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
-                               OR
-                                  (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - in_start_hour) > max_hour
-                               )
+                               OR (SELECT get_hours(Q1.eid)) + span > 30)
                        )
             ),
             R2 AS (SELECT DISTINCT Q2.eid, Q2.name
