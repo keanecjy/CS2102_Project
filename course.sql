@@ -88,7 +88,7 @@ BEGIN
         end_date                    = latest_end_date,
         target_number_registrations = target_num,
         seating_capacity            = seat_capacity
-    WHERE cid = course_id
+    WHERE course_id = cid
       AND launch_date = l_date;
 
 END;

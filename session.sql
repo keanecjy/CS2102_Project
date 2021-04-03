@@ -9,7 +9,7 @@
 -- TODO: Trigger - Each room can be used to conduct at most one course session at any time (CONSTRAINT TYPE) (Done) (in room_availability_checks)
 -- TODO: Trigger - New sessions added should not collide with lunch time or start or end timing (IN new_session_timing_collision_checks)
 -- TODO: Trigger - Course offering have to exist first before adding session (in course_offering_exists)
-CREATE OR REPLACE PROCEDURE add_session(IN cid INT, IN date_of_launch DATE, IN session_number INT, IN session_date DATE, IN start_hour TIME, IN eid INT, IN rid INT)
+CREATE OR REPLACE PROCEDURE add_session(cid INT, date_of_launch DATE, session_number INT, session_date DATE, start_hour TIME, eid INT, rid INT)
 AS $$
 DECLARE
     course_deadline DATE;
@@ -64,7 +64,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE remove_session(IN cid INT, IN date_of_launch DATE, IN sid INT)
+CREATE OR REPLACE PROCEDURE remove_session(cid INT, date_of_launch DATE, sid INT)
 AS $$
 DECLARE
     session_date DATE;

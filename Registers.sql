@@ -1,5 +1,5 @@
-CREATE OR REPLACE PROCEDURE register_session(IN cus_id INT, IN cid INT, IN date_of_launch DATE, IN session_number INT, IN card_number TEXT,
-                                             IN buy_date DATE, IN pid INT, IN pay_method TEXT)
+CREATE OR REPLACE PROCEDURE register_session(cus_id INT, cid INT, date_of_launch DATE, session_number INT, card_number TEXT,
+                                             buy_date DATE, pid INT, pay_method TEXT)
 AS $$
 DECLARE
     deadline Date;
@@ -75,7 +75,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE cancel_registration(IN cus_id INT, IN cid INT, IN date_of_launch DATE)
+CREATE OR REPLACE PROCEDURE cancel_registration(cus_id INT, cid INT, date_of_launch DATE)
 AS $$
 DECLARE
     sid_register INT;
