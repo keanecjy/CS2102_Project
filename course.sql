@@ -26,23 +26,24 @@ $$ language sql;
 -- 4.
 -- */
 
+-- TODO: Add target num of registrations to params
 create or replace procedure add_course_offering(cid int, l_date date, fees float, reg_deadline date,
                                                 admin_id int, sessions_arr text[][])
-AS $$
+AS
+$$
 
 DECLARE
-    temp text[];
-    course_area text;
-    course_duration int;
-    s_date date;
-    s_time time;
-    s_rid int;
-
-    seat_capacity int;
-    inst_eid int;
-    next_sid int;
+    temp                text[];
+    course_area         text;
+    course_duration     int;
+    s_date              date;
+    s_time              time;
+    s_rid               int;
+    seat_capacity       int;
+    inst_eid            int;
+    next_sid            int;
     earliest_start_date date;
-    latest_end_date date;
+    latest_end_date     date;
 
 BEGIN
     -- 	Checking validity of course offering information
@@ -54,7 +55,7 @@ BEGIN
         raise exception 'Course offering details are invalid';
     end if;
 
-    select area_name, duration into course_area, course_duration from Courses  where course_id = cid;
+    select area_name, duration into course_area, course_duration from Courses where course_id = cid;
     next_sid := 1;
     seat_capacity := 0;
 
@@ -78,11 +79,13 @@ BEGIN
             end if;
 
             -- Find an eid from the list of available instructors (do we need to find the most optimal?)
-            select eid into inst_eid
+            select eid
+            into inst_eid
             from find_instructors(cid, s_date, s_time)
             limit 1;
 
             if (inst_eid is null) then
+                -- TODO: Cleanup by deleting previously added sessions?
                 raise exception 'Not able to find instructor to allocate';
             end if;
 
@@ -99,18 +102,129 @@ BEGIN
 
         end loop;
 
+    -- Update the course offerings record after all sessions are inserted
     update Offerings
-    set start_date = earliest_start_date,
-        end_date = latest_end_date,
+    set start_date                  = earliest_start_date,
+        end_date                    = latest_end_date,
         target_number_registrations = seat_capacity,
-        seating_capacity = seat_capacity
-    where cid = course_id and launch_date = l_date;
+        seating_capacity            = seat_capacity
+    where cid = course_id
+      and launch_date = l_date;
 
 END;
 
 $$ language plpgsql;
 
+-- Q15
+-- Retrieves all course offerings that can be registered
+-- Output is sorted in ascending order of registration deadline and course title.
+-- Can be registered == seating_capacity - numRegistered > 0
+create or replace function get_available_course_offerings()
+    returns table
+            (
+                title                 text,
+                area_name             text,
+                start_date            date,
+                end_date              date,
+                registration_deadline date,
+                fees                  float,
+                remaining_seats       int
+            )
+AS
+$$
+with NumRegistered as (
+    select course_id, launch_date, count(*) as numReg
+    from ((select course_id, launch_date from Registers) union all (select course_id, launch_date from Redeems)) R
+    group by course_id, launch_date
+)
+
+select title,
+       area_name,
+       start_date,
+       end_date,
+       registration_deadline,
+       fees,
+       seating_capacity - coalesce(numReg, 0)
+from (Courses natural join Offerings)
+         natural left join NumRegistered
+where start_date >= current_date
+  and seating_capacity - coalesce(numReg, 0) > 0;
+
+$$ language sql;
 
 
 
+-- Q16
+-- Retrieve all the available sessions for a course offering that could be registered.
+create or replace function get_available_course_sessions(cid int, date_of_launch date)
+    returns table
+            (
+                session_date    date,
+                start_time      time,
+                inst_name       text,
+                remaining_seats int
+            )
+AS
+$$
+select session_date, start_time, name, seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid)
+from (Sessions
+    natural join Rooms)
+         natural join Employees
+where course_id = cid
+  and launch_date = date_of_launch
+  and session_date >= current_date
+  and seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid) > 0;
+
+$$ language sql;
+
+
+
+-- Helper function to query the num of registrations for the session
+create or replace function get_num_registration_for_session(session_id int, date_launch date, cid int)
+    returns int AS
+$$
+select count(*)
+from ((select sid, launch_date, course_id from Redeems)
+      union all
+      (select sid, launch_date, course_id from Registers)) R
+where sid = session_id
+  and launch_date = date_launch
+  and course_id = cid;
+$$ language sql;
+
+
+/*
+Q19
+1. Check for seat availability is done by trigger
+2. Check if customers registered or redeemed for the session and update accordingly
+3. Check for current_date before registration deadline
+
+*/
+create or replace procedure update_course_session(customer_id int, cid int, date_launch date, new_sid int)
+AS
+$$
+
+BEGIN
+    if (exists(select 1
+               from Redeems
+               where cust_id = customer_id
+                 and course_id = cid
+                 and launch_date = date_launch)) then
+
+        update Redeems
+        set sid         = new_sid,
+            redeem_date = current_date
+        where cust_id = customer_id
+          and course_id = cid
+          and launch_date = date_launch;
+    else
+        update Registers
+        set sid         = new_sid,
+            redeem_date = current_date
+        where cust_id = customer_id
+          and course_id = cid
+          and launch_date = date_launch;
+    end if;
+END;
+$$ language plpgsql;
 
