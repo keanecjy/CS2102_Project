@@ -396,3 +396,34 @@ CREATE TRIGGER valid_session
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();
 
+-- to ensure that course offerings will have >= 1
+CREATE OR REPLACE FUNCTION after_insert_into_offerings()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF (NOT EXISTS (SELECT 1 FROM Sessions S WHERE S.launch_date = NEW.launch_date AND S.course_id = NEW.course_id)) THEN
+        RAISE EXCEPTION 'There isnt any session in this offerings %', NEW.course_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER after_insert_into_offerings
+AFTER INSERT ON Offerings DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION after_insert_into_offerings();
+
+-- to ensure that course offerings will have >= 1
+CREATE OR REPLACE FUNCTION before_delete_of_sessions()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF (1 = (SELECT COUNT(*) FROM Sessions S WHERE S.launch_date = OLD.launch_date AND S.course_id = OLD.course_id)) THEN
+        RAISE EXCEPTION  'You cant delete this session after there will be no more session % left in this offering %', OLD.sid, OLD.courseid;
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER before_delete_of_sessions
+BEFORE DELETE ON Sessions
+FOR EACH ROW EXECUTE FUNCTION before_delete_of_sessions();
