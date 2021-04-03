@@ -199,6 +199,10 @@ FOR EACH ROW EXECUTE FUNCTION instructors_overlap_timing_checks();
 CREATE OR REPLACE FUNCTION room_availability_checks()
     RETURNS TRIGGER AS $$
 BEGIN
+    IF (TG_OP = 'UPDATE' AND OLD.rid = NEW.rid) THEN
+        RETURN NEW;
+    END IF;
+
     -- VALIDATE THE ROOM AVAILABILITY
     IF (EXISTS (SELECT 1
                 FROM Sessions S

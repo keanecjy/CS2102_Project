@@ -13,13 +13,13 @@ CREATE OR REPLACE PROCEDURE add_session(in_cid INT, date_of_launch DATE, session
 AS $$
 DECLARE
     course_deadline DATE;
-    span TIME;
+    span interval;
     min_date DATE;
     max_date DATE;
     max_sid INT;
 BEGIN
-    SELECT DISTINCT registration_deadline, duration INTO course_deadline, span
-    FROM Offerings
+    SELECT DISTINCT registration_deadline, concat(duration, ' hours')::interval INTO course_deadline, span
+    FROM Offerings natural join Courses
     WHERE course_id = in_cid
       AND launch_date = date_of_launch;
 
@@ -28,7 +28,7 @@ BEGIN
     END IF;
 
     -- check and enforce that the sid being inserted is in increasing order
-    SELECT MAX(sid) INTO max_sid From Sessions S WHERE S.cid = in_cid AND S.launch_date = date_of_launch;
+    SELECT MAX(sid) INTO max_sid From Sessions S WHERE S.course_id = in_cid AND S.launch_date = date_of_launch;
     IF (session_number <= max_sid) THEN
         RAISE EXCEPTION 'Sid is not in increasing order';
     END IF;
@@ -74,18 +74,18 @@ DECLARE
     second_smallest_date DATE;
     second_largest_date DATE;
 BEGIN
-    SELECT DISTINCT S.session_date into date_of_session FROM Session S where S.sid = in_sid and S.cid = in_cid and S.launch_date = date_of_launch;
+    SELECT DISTINCT S.session_date into date_of_session FROM Session S where S.sid = in_sid and S.course_id = in_cid and S.launch_date = date_of_launch;
     IF (date_of_session <= current_date) THEN
         RAISE EXCEPTION 'Course session has already started';
     END IF;
 
-    IF (NOT EXISTS (SELECT 1 FROM Sessions S WHERE S.cid = in_cid AND S.sid = in_sid AND S.launch_date = date_of_launch)) THEN
+    IF (NOT EXISTS (SELECT 1 FROM Sessions S WHERE S.course_id = in_cid AND S.sid = in_sid AND S.launch_date = date_of_launch)) THEN
         RAISE EXCEPTION 'NO SUCH SESSION TO DELETE';
     END IF;
 
     -- deletes
     DELETE FROM Sessions S
-    WHERE S.cid = in_cid
+    WHERE S.course_id = in_cid
       AND S.sid = in_sid
       AND S.launch_date = date_of_launch
     RETURNING S.rid INTO room_id;
@@ -101,7 +101,7 @@ BEGIN
         FROM Sessions S
         WHERE S.sid = in_sid
           AND S.launch_date = date_of_launch
-          AND S.cid = in_cid
+          AND S.course_id = in_cid
         ORDER BY S.session_date
         OFFSET 1
             LIMIT 1;
@@ -117,7 +117,7 @@ BEGIN
         FROM Sessions S
         WHERE S.sid = in_sid
           AND S.launch_date = date_of_launch
-          AND S.cid = in_cid
+          AND S.course_id = in_cid
         ORDER BY S.Session_date DESC
         OFFSET 1
             LIMIT 1;

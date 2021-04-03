@@ -172,15 +172,20 @@ CREATE OR REPLACE PROCEDURE update_instructor(in_cid INT, date_of_launch DATE, i
 AS $$
 DECLARE
     s_date date; -- session date
+    s_time time;
 BEGIN
-    SELECT S.session_date into s_date FROM Sessions S WHERE S.sid = in_sid AND S.launch_date = date_of_launch AND S.cid = in_cid;
-    IF (current_date < s_date) THEN
+    SELECT S.session_date, S.start_time into s_date, s_time 
+    FROM Sessions S 
+    WHERE S.sid = in_sid AND S.launch_date = date_of_launch AND S.course_id = in_cid;
+
+    IF (current_date > s_date OR (current_date = s_date AND current_time > s_time)) THEN
         RAISE EXCEPTION 'This session has already passed';
     END IF;
 
     UPDATE Sessions
     SET eid = new_eid
-    WHERE eid = (SELECT S1.eid FROM Sessions S1 WHERE S1.course_id = in_cid AND S1.sid = in_sid AND S1.launch_date = date_of_launch);
+    WHERE (sid, launch_date, course_id) = (in_sid, date_of_launch, in_cid) AND 
+        eid = (SELECT S1.eid FROM Sessions S1 WHERE S1.course_id = in_cid AND S1.sid = in_sid AND S1.launch_date = date_of_launch);
 END;
 $$ LANGUAGE plpgsql;
 

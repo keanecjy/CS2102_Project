@@ -131,7 +131,7 @@ BEGIN
     where course_id = _cid and launch_date = _launch_date and sid = _session_num;
 
     if _session_date < current_date
-        or (_session_date = current_date and _session_time <= _current_time) then
+        or (_session_date = current_date and _session_time <= current_time) then
         raise exception 'Room is not updated as the session has already started.';
     end if;
 
