@@ -262,3 +262,67 @@ CREATE TRIGGER unique_session_per_course_redeem_checks
 BEFORE INSERT ON Redeems
 FOR EACH ROW EXECUTE FUNCTION unique_session_per_course_redeem_checks();
 
+
+/*
+Trigger to check for inserting/updating a registration/redemption of session.
+1) Check if current_date have already past the session_date itself
+2) Check if current_date have already past the registration_deadline
+3) Check if number of registration + redeems <= seating_capacity
+
+*/
+create or replace function reg_redeem_check()
+    returns trigger as
+$$
+DECLARE
+    deadline date;
+    s_date   date;
+    seat_cap int;
+
+BEGIN
+
+    select registration_deadline
+    into deadline
+    from Offerings
+    where launch_date = new.launch_date
+      and course_id = new.course_id;
+
+    select seating_capacity, session_date
+    into seat_cap, s_date
+    from Sessions natural join Rooms
+    where new.sid = sid
+      and new.launch_date = launch_date
+      and new.course_id = course_id;
+
+    -- Check if current_date have already past the session_date or registration deadline
+    if (current_date > s_date or current_date > deadline) then
+        raise notice 'It is too late to register for this session!';
+        return null;
+    end if;
+
+    -- Check if there is enough slots in the session
+    if (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) >= seat_cap) then
+        raise notice 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
+        return null;
+    end if;
+
+    return new;
+END;
+
+$$ language plpgsql;
+
+
+drop trigger if exists valid_session on Redeems;
+drop trigger if exists valid_session on Registers;
+
+create trigger valid_session
+    before insert or update
+    on Redeems
+    for each row
+execute function reg_redeem_check();
+
+create trigger valid_session
+    before insert or update
+    on Registers
+    for each row
+execute function reg_redeem_check();
+
