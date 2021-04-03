@@ -66,7 +66,7 @@ BEGIN
         RAISE EXCEPTION 'Cant a session before 9am';
     END IF;
 
-    SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = cid;
+    SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = in_cid;
 
     -- validate session_date + duration
     IF ((in_start_hour, in_start_hour + span) OVERLAPS (TIME '12:00', TIME '14:00') OR (in_start_hour + span > TIME '18:00')) THEN

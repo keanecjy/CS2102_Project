@@ -100,7 +100,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-
 -- Helper function to create table containing all registers and redeems
 CREATE OR REPLACE FUNCTION combine_reg_redeems()
     RETURNS table
