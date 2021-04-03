@@ -19,7 +19,7 @@ BEGIN
             IF (1 = (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
                 AND NOT (_start_time, _start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
                 AND NOT (_start_time, _start_time + span_interval) OVERLAPS (twelve_pm, two_pm))) THEN
-                arr = array_append(arr, _start_time);
+                arr := array_append(arr, _start_time);
             END IF;
             _start_time := _start_time + one_hour;
         end loop;
