@@ -51,7 +51,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION find_instructors(IN in_cid int, IN in_session_date date, IN in_start_hour time)
     RETURNS TABLE (eid int, name text) AS $$
 DECLARE
-    span interval;
+    span INT;
     end_hour time;
     max_hour interval := concat(30, ' hours')::interval;
     one_hour interval := concat(1, ' hours')::interval;
@@ -66,7 +66,7 @@ BEGIN
         RAISE EXCEPTION 'Cant a session before 9am';
     END IF;
 
-    SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = in_cid;
+    SELECT duration INTO span FROM Courses WHERE Courses.course_id = in_cid;
 
     -- validate session_date + duration
     IF ((in_start_hour, in_start_hour + span) OVERLAPS (TIME '12:00', TIME '14:00') OR (in_start_hour + span > TIME '18:00')) THEN
@@ -87,9 +87,7 @@ BEGIN
                        WHERE S1.session_date = in_session_date
                          AND S1.eid = Q1.eid
                          AND ((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour)
-                           OR
-                              (concat((SELECT get_hours(Q1.eid)), ' hours')::interval) + (end_hour - in_start_hour) > max_hour
-                           )
+                           OR (SELECT get_hours(Q1.eid)) + span > 30)
                    )
         ),
         R2 AS (SELECT DISTINCT Q2.eid, Q2.name
@@ -117,9 +115,9 @@ CREATE OR REPLACE FUNCTION get_available_instructors(IN in_cid INT, IN in_start_
     RETURNS TABLE (eid INT, name TEXT, hours INT, day date, available_hours Time[]) AS $$
 DECLARE
     max_hour interval;
-    span interval;
+    span int;
 BEGIN
-    SELECT concat(duration, ' hours')::interval INTO span FROM Courses WHERE Courses.course_id = cid;
+    SELECT duration INTO span FROM Courses WHERE Courses.course_id = cid;
     max_hour := concat(30, ' hours')::interval;
     with
         R0 AS (SELECT DISTINCT Q0.eid, Q0.name
@@ -128,7 +126,7 @@ BEGIN
         R1 AS (SELECT s_day FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
         R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
                FROM (R0 NATURAL JOIN Part_time_instructors CROSS JOIN R1) AS Q2
-               WHERE (concat((SELECT get_hours(Q2.eid)), ' hours')::interval) + span <= max_hour
+               WHERE (SELECT get_hours(Q2.eid)) + span <= 30
                  AND (SELECT EXTRACT(dow FROM Q2.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q2.eid, span, Q2.s_day), 1)) <> 0
         ),
