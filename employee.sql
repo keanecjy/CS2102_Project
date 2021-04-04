@@ -116,7 +116,7 @@ $$ LANGUAGE plpgsql;
 -- the part-time instructor taught at all sessions for that particular month and year.
 CREATE OR REPLACE FUNCTION pay_salary()
 RETURNS TABLE(_eid int, _name text, _status text, _num_work_days int, _num_work_hours int,
-    _hourly_rate float, _monthly_salary float, _amount float) AS $$
+    _hourly_rate float, _monthly_salary float, _amount numeric) AS $$
 DECLARE
     curs cursor for (select * from employees order by eid);
     r record;
@@ -146,7 +146,7 @@ BEGIN
             
             -- compute number of hours worked by the part-time instructor
             -- assume start_time and end_time are in units of hour
-            select sum(extract(hour from end_time) - extract(hour from start_time))::int
+            select coalesce(sum(extract(hour from end_time) - extract(hour from start_time))::int, 0)
                 into _num_work_hours
             from Sessions
             where eid = _eid
@@ -158,7 +158,8 @@ BEGIN
             where eid = _eid;
 
             _monthly_salary := null;
-            _amount := _num_work_hours * _hourly_rate;
+            _amount := (_num_work_hours * _hourly_rate)::numeric;
+            _amount := round(_amount, 2);
 
             return next;
         else -- full-time employee
@@ -195,7 +196,8 @@ BEGIN
             from Full_time_emp
             where eid = _eid;
 
-            _amount := _num_work_days / _num_of_days * _monthly_salary;
+            _amount := (_num_work_days::numeric / _num_of_days * _monthly_salary)::numeric;
+            _amount := round(_amount, 2);
             
             return next;
         end if;
@@ -203,7 +205,7 @@ BEGIN
         -- insert salary payment record
         _pay_date := make_date(_pay_year, _pay_month, _num_of_days);
         insert into Pay_slips
-        values (_eid, _pay_date, _amount, _num_work_days, _num_work_hours);
+        values (_eid, _pay_date, _amount::numeric, _num_work_days, _num_work_hours);
 
     end loop;
     close curs;

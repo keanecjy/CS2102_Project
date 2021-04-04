@@ -76,7 +76,7 @@ CREATE TABLE Pay_slips
 (
     eid 			int references Employees on delete cascade,
     payment_date 	date,
-    amount 			float not null,
+    amount 			numeric not null,
     num_work_days 	int,
     num_work_hours  int,
 
