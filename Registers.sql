@@ -1,11 +1,6 @@
 CREATE OR REPLACE PROCEDURE register_session(cus_id INT, in_cid INT, date_of_launch DATE, session_number INT, pay_method TEXT)
 AS $$
 DECLARE
-    deadline Date;
-    date_of_session Date;
-    capacity INT;
-    num_reg INT;
-    num_redeem INT;
     pid int;
     num_card TEXT;
     date_of_buy DATE;
@@ -32,6 +27,7 @@ BEGIN
         INSERT INTO Redeems VALUES (current_date, date_of_buy, cus_id, pid, session_number, date_of_launch, in_cid);
 
         -- decrement the num of remaining redemptions for that particular package
+        -- shift as triggers?
         UPDATE Buys B
         SET num_remaining_redemptions = num_remaining_redemptions - 1
         WHERE B.cust_id = cus_id;
@@ -83,6 +79,12 @@ BEGIN
           AND S.course_id = in_cid
           AND S.launch_date = date_of_launch;
 
+        DELETE FROM Redeems R
+        WHERE R.cust_id = cus_id
+          AND R.course_id = in_cid
+          AND R.launch_date = date_of_launch;
+    
+        -- update as triggers?
         IF ((SELECT (date_of_session - current_date) AS days) >= 7) THEN
             UPDATE Buys B
             SET num_remaining_redemptions = num_remaining_redemptions + 1
@@ -90,25 +92,21 @@ BEGIN
               AND B.cust_id = cus_id
               AND B.package_id = pid;
         END IF;
-
-        DELETE FROM Redeems R
-        WHERE R.cust_id = cus_id
-          AND R.course_id = in_cid
-          AND R.launch_date = date_of_launch;
         
         INSERT INTO Cancels VALUES (now(), null, 1, cus_id, sid_redeem, date_of_launch, in_cid);
     ELSE
+        -- DELETE FROM registers
         DELETE FROM Registers R
         WHERE R.cust_id = cus_id
           AND R.course_id = in_cid
           AND R.launch_date = date_of_launch;
-        
+
         SELECT S.session_date INTO date_of_session
         FROM Sessions S
         WHERE S.sid = sid_register
-            AND S.course_id = in_cid
-            AND S.launch_date = date_of_launch;
-
+          AND S.course_id = in_cid
+          AND S.launch_date = date_of_launch;
+        
         IF (current_date + 7 <= date_of_session) THEN
             select fees into cost FROM Offerings WHERE course_id = in_cid AND launch_date = date_of_launch;
             INSERT INTO Cancels VALUES (now(), 0.9 * cost, null, cus_id, sid_register, date_of_launch, in_cid);

@@ -98,7 +98,7 @@ BEGIN
                            WHERE S1.eid = Q1.eid
                              AND (((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour) AND 
                                     S1.session_date = in_session_date)
-                                OR (SELECT get_hours(Q1.eid)) + span > 1)
+                                OR (SELECT get_hours(Q1.eid)) + span > 30)
                        )
             ),
             R2 AS (SELECT DISTINCT Q2.eid, Q2.name

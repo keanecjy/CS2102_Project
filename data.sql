@@ -46,45 +46,49 @@ INSERT INTO Employees (eid, name, phone, email, address, join_date) VALUES
 (37, 'Jae Gippes', '94666112', 'jgippes10@skyrock.com', '760 Northport Alley', '9/27/2020'),
 (38, 'Darwin Pillifant', '86795443', 'dpillifant11@issuu.com', '57 Anderson Hill', '6/10/2020'),
 (39, 'Hi Christensen', '98789416', 'hchristensen12@rakuten.co.jp', '24474 Dapin Court', '9/30/2020'),
-(40, 'Cordelie Laugheran', '90505833', 'claugheran13@dedecms.com', '473 Carey Alley', '9/20/2020');
-
+(40, 'Cordelie Laugheran', '90505833', 'claugheran13@dedecms.com', '473 Carey Alley', '9/20/2020'),
+(41, 'mr part-time', '99991111', 'pt@nus.edu.sg', 'sad tree', '9/20/2020'),
+(42, 'manager4pt', '12312312', 'man@nus.edu.sg', 'sad tree2', '8/20/2020'),
+(43, 'admin4pt', '12341234', 'adminpt@nus.edu.sg', 'sad tree3', '7/20/2020'),
+(44, 'mr part-time free', '44443333', '44443333@nus.edu.sg', 'sad tree4', '10/20/2020'),
+(45, 'mr full-time free', '54443333', '54443333@nus.edu.sg', 'sad tree5', '10/20/2020');
 
 INSERT INTO Part_time_emp (eid, hourly_rate) VALUES
 (4, 14.50), (7, 8.00), (9, 10.80), (10, 16.00), (12, 12.00),
-(21, 12.50), (23, 13.00), (24, 9.60), (29, 13.50), (37, 10.00);
+(21, 12.50), (23, 13.00), (24, 9.60), (29, 13.50), (37, 10.00), (41, 9.95), (44, 12.20);
 
 
 INSERT INTO Full_time_emp (eid, monthly_salary) VALUES
 -- Full-time instructors
 (2, 5450), (14, 6010), (20, 3800), (25, 2450), (31, 8120),
-(35, 3450), (36, 3650), (38, 4100), (39, 4210), (40, 7754),
+(35, 3450), (36, 3650), (38, 4100), (39, 4210), (40, 7754), (45, 9999),
 -- Administrators
 (1, 5400), (3, 5830), (5, 4590), (6, 3390), (15, 5480),
-(17, 5000), (26, 4100), (28, 4000), (32, 3800), (33, 6100),
+(17, 5000), (26, 4100), (28, 4000), (32, 3800), (33, 6100), (43, 1000),
 -- Managers
 (8, 4800), (11, 6200), (13, 5490), (16, 5210), (18, 4490),
-(19, 4500), (22, 7700), (27, 5500), (30, 4320), (34, 3910);
+(19, 4500), (22, 7700), (27, 5500), (30, 4320), (34, 3910), (42, 4000);
 
 
 INSERT INTO Instructors (eid) VALUES
 (2), (4), (7), (9), (10), (12), (14), (20), (21), (23), 
-(24), (25), (29), (31), (35), (36), (37), (38), (39), (40);
+(24), (25), (29), (31), (35), (36), (37), (38), (39), (40), (41), (44), (45);
 
 
 INSERT INTO Part_time_instructors (eid) VALUES
-(4), (7), (9), (10), (12), (21), (23), (24), (29), (37);
+(4), (7), (9), (10), (12), (21), (23), (24), (29), (37), (41), (44);
 
 
 INSERT INTO Full_time_instructors (eid) VALUES
-(2), (14), (20), (25), (31), (35), (36), (38), (39), (40);
+(2), (14), (20), (25), (31), (35), (36), (38), (39), (40), (45);
 
 
 INSERT INTO Administrators (eid) VALUES
-(1), (3), (5), (6), (15), (17), (26), (28), (32), (33);
+(1), (3), (5), (6), (15), (17), (26), (28), (32), (33), (43);
 
 
 INSERT INTO Managers (eid) VALUES
-(8), (11), (13), (16), (18), (19), (22), (27), (30), (34);
+(8), (11), (13), (16), (18), (19), (22), (27), (30), (34), (42);
 
 
 /**
@@ -120,8 +124,14 @@ INSERT INTO Course_areas (area_name, eid) VALUES
 ('Computer Networks', 16), 
 ('Parallel Computing', 19), 
 ('Programming Languages', 27),
-('Software Engineering', 30);
-
+('Software Engineering', 30),
+('course1', 42),
+('course2', 42),
+('course3', 42),
+('course4', 42),
+('course5', 42),
+('course6', 42);
+                                                 
 
 INSERT INTO Specializes (eid, area_name) VALUES
 (2, 'Algorithms & Theory'), (4, 'Software Engineering'),
@@ -133,7 +143,10 @@ INSERT INTO Specializes (eid, area_name) VALUES
 (29, 'Artificial Intelligence'), (31, 'Algorithms & Theory'),
 (35, 'Computer Networks'), (36, 'Database Systems'),
 (37, 'Software Engineering'), (38, 'Database Systems'),
-(39, 'Artificial Intelligence'), (40, 'Database Systems');
+(39, 'Artificial Intelligence'), (40, 'Database Systems'),
+(41, 'course1'), (41, 'course2'), (41, 'course3'), (41, 'course4'),(41, 'course5'), (41, 'course6'),
+(44, 'course1'), (44, 'course2'), (44, 'course3'), (44, 'course4'),(44, 'course5'), (44, 'course6'),
+(45, 'course1'), (45, 'course2'), (45, 'course3'), (45, 'course4'),(45, 'course5'), (45, 'course6');
 
 
 INSERT INTO Courses (course_id, title, description, area_name, duration) VALUES
@@ -146,8 +159,13 @@ INSERT INTO Courses (course_id, title, description, area_name, duration) VALUES
 (2105, 'Intro to Computer Networks', 'Are you sure you know how the internet works?', 'Computer Networks', 1),
 (5224, 'Cloud Computing', 'Jump onto the hype and learn more about Cloud Technology', 'Parallel Computing', 3),
 (2104, 'Programming Language Concepts', 'Learn up to 8 different programming languages in an hour', 'Programming Languages', 1),
-(2103, 'Software Engineering', 'Hello, I am Duke, lets learn to build an address book!', 'Software Engineering', 1);
-
+(2103, 'Software Engineering', 'Hello, I am Duke, lets learn to build an address book!', 'Software Engineering', 1),
+(1, 'course1', 'c1', 'course1', 3),
+(2, 'course2', 'c2', 'course2', 3),
+(3, 'course3', 'c3', 'course3', 3),
+(4, 'course4', 'c4', 'course4', 3),
+(5, 'course5', 'c5', 'course5', 3),
+(6, 'course6', 'c6', 'course6', 3);
 
 INSERT INTO Offerings (launch_date, course_id, registration_deadline, start_date, end_date, eid, target_number_registrations, seating_capacity, fees) VALUES
 ('12/24/2020', 2102, '1/28/2021', '2/11/2021', '2/12/2021', 32, 85, 1000, 181.40),
@@ -161,6 +179,12 @@ INSERT INTO Offerings (launch_date, course_id, registration_deadline, start_date
 ('2/13/2021', 2102, '4/7/2021', '4/19/2021', '4/19/2021', 33, 55, 200, 75.50),
 ('3/7/2020', 3247, '4/28/2021', '5/10/2021', '5/10/2021', 33, 68, 100, 155.50),
 ('4/18/2021', 3230, '5/10/2021', '5/20/2021', '5/20/2021', 17, 100, 500, 137.77);
+('4/1/2021', 1, '4/10/2021', '4/20/2021', '4/30/2021', 43, 100, 0, 250),
+('4/2/2021', 2, '4/11/2021', '4/21/2021', '4/30/2021', 43, 100, 0, 250),
+('4/1/2021', 3, '4/10/2021', '4/20/2021', '4/30/2021', 43, 100, 0, 250),
+('4/2/2021', 4, '4/11/2021', '4/21/2021', '4/30/2021', 43, 100, 0, 250),
+('4/1/2021', 5, '4/10/2021', '4/20/2021', '4/30/2021', 43, 100, 0, 250),
+('4/2/2021', 6, '4/11/2021', '4/21/2021', '4/30/2021', 43, 100, 0, 250);
 
 INSERT INTO Sessions (sid, launch_date, course_id, session_date, start_time, end_time, rid, eid)
 VALUES
@@ -176,7 +200,34 @@ VALUES
 (1, '12/13/2020', 2104, '2/12/2021', '14:00', '15:00', 1 ,12),
 (1, '2/13/2021', 2102, '4/19/2021', '11:00', '12:00', 4, 9),
 (1, '3/7/2020', 3247, '5/10/2021', '16:00', '18:00', 10, 21),
-(1, '4/18/2021', 3230, '5/20/2021', '15:00', '18:00', 2, 2);
+(1, '4/18/2021', 3230, '5/20/2021', '15:00', '18:00', 2, 2),
+-- this makes eid = 41 part time teach = 30 hours
+(1, '4/1/2021', 1, '4/26/2021', '09:00', '12:00', 1, 41),
+(2, '4/1/2021', 1, '4/26/2021', '14:00', '17:00', 1, 41),
+(3, '4/1/2021', 1, '4/27/2021', '09:00', '12:00', 1, 41),
+(4, '4/1/2021', 1, '4/27/2021', '14:00', '17:00', 1, 41),
+(5, '4/1/2021', 1, '4/28/2021', '09:00', '12:00', 1, 41),
+(6, '4/1/2021', 1, '4/28/2021', '15:00', '18:00', 1, 41),
+(7, '4/1/2021', 1, '4/29/2021', '09:00', '12:00', 1, 41),
+(1, '4/2/2021', 2, '4/29/2021', '15:00', '18:00', 1, 41),
+(2, '4/2/2021', 2, '4/30/2021', '09:00', '12:00', 1, 41),
+(3, '4/2/2021', 2, '4/30/2021', '14:00', '17:00', 1, 41),
+-- this make eid = 44 part time teach < 30 hours
+(8, '4/1/2021', 3, '4/26/2021', '09:00', '12:00', 2, 44),
+(9, '4/1/2021', 3, '4/26/2021', '14:00', '17:00', 2, 44),
+(4, '4/2/2021', 4, '4/28/2021', '09:00', '12:00', 2, 44),
+(5, '4/2/2021', 4, '4/28/2021', '15:00', '18:00', 2, 44),
+-- this makes eid = 45 teach = 30 hours
+(10, '4/1/2021', 5, '4/26/2021', '09:00', '12:00', 3, 45),
+(11, '4/1/2021', 5, '4/26/2021', '14:00', '17:00', 3, 45),
+(12, '4/1/2021', 5, '4/27/2021', '09:00', '12:00', 3, 45),
+(13, '4/1/2021', 5, '4/27/2021', '15:00', '18:00', 3, 45),
+(14, '4/1/2021', 5, '4/28/2021', '09:00', '12:00', 3, 45),
+(15, '4/1/2021', 5, '4/28/2021', '14:00', '17:00', 3, 45),
+(16, '4/1/2021', 5, '4/29/2021', '09:00', '12:00', 3, 45),
+(6, '4/2/2021', 6, '4/29/2021', '15:00', '18:00', 3, 45),
+(7, '4/2/2021', 6, '4/30/2021', '09:00', '12:00', 3, 45),
+(8, '4/2/2021', 6, '4/30/2021', '14:00', '17:00', 3, 45);
 
 
 /************************
