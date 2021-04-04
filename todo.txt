@@ -1,1 +1,0 @@
-WITH RECURSIVE (add_course_offerings)
