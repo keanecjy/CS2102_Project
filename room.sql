@@ -125,6 +125,14 @@ DECLARE
     _num_of_register int;
     _num_of_cancel int;
 BEGIN
+    -- check if session exists
+    if not exists (
+        select 1
+        from Sessions
+        where course_id = _cid and launch_date = _launch_date and sid = _session_num) then
+        raise exception 'Course session does not exist.';
+    end if;
+
     -- check that session has not started yet
     select session_date, start_time into _session_date, _session_time
     from Sessions
