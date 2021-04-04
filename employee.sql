@@ -146,7 +146,7 @@ BEGIN
             
             -- compute number of hours worked by the part-time instructor
             -- assume start_time and end_time are in units of hour
-            select sum(extract(hour from end_time) - extract(hour from start_time))::int
+            select coalesce(sum(extract(hour from end_time) - extract(hour from start_time))::int, 0)
                 into _num_work_hours
             from Sessions
             where eid = _eid
@@ -195,7 +195,7 @@ BEGIN
             from Full_time_emp
             where eid = _eid;
 
-            _amount := _num_work_days / _num_of_days * _monthly_salary;
+            _amount := _num_work_days::float / _num_of_days * _monthly_salary;
             
             return next;
         end if;
@@ -203,7 +203,7 @@ BEGIN
         -- insert salary payment record
         _pay_date := make_date(_pay_year, _pay_month, _num_of_days);
         insert into Pay_slips
-        values (_eid, _pay_date, _amount, _num_work_days, _num_work_hours);
+        values (_eid, _pay_date, trunc(_amount::numeric, 2), _num_work_days, _num_work_hours);
 
     end loop;
     close curs;
