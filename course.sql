@@ -252,7 +252,7 @@ CREATE OR REPLACE FUNCTION promote_courses()
 AS
 $$
 WITH InActiveCust AS (SELECT cust_id, name
-                      FROM combine_reg_redeems()
+                      FROM combine_reg_redeems() NATURAL join Customers
                       GROUP BY cust_id, name
                       HAVING MAX(register_date) + INTERVAL '5 months' < DATE_TRUNC('month', CURRENT_DATE)),
      CustWithNoOfferings AS (SELECT cust_id, name
