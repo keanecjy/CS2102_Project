@@ -59,7 +59,7 @@ BEGIN
     WHERE course_id = NEW.course_id;
 
     -- VALIDATE PART-TIME INSTRUCTOR
-    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((SELECT get_hours(NEW.eid)) + span > 30)) THEN
+    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((SELECT get_hours(NEW.eid, NEW.session_date)) + span > 30)) THEN
         RAISE EXCEPTION 'This part-time instructor is going to be OVERWORKED if he take this session!';
         RETURN NULL;
     END IF;

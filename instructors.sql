@@ -14,22 +14,22 @@ DECLARE
     span_interval interval := concat(span, ' hours')::interval;
 BEGIN
     -- IF THIS GUY HAVE SOMETHING ON THIS DAY, THEN WE ITERATE, ELSE, WE CAN ADD ALL THE DAYS POSSIBLE
-    IF (1 = (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date)) THEN
+    IF (EXISTS (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date)) THEN
         WHILE (_start_time + span_interval <= _end_time) LOOP
-            IF (1 = (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
-                AND NOT (_start_time, _start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
-                AND NOT (_start_time, _start_time + span_interval) OVERLAPS (twelve_pm, two_pm))) THEN
-                arr := array_append(arr, _start_time);
-            END IF;
-            _start_time := _start_time + one_hour;
-        end loop;
+                IF (EXISTS (SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date
+                                                       AND NOT (_start_time, _start_time + span_interval) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour)
+                                                       AND NOT (_start_time, _start_time + span_interval) OVERLAPS (twelve_pm, two_pm))) THEN
+                    arr := array_append(arr, _start_time);
+                END IF;
+                _start_time := _start_time + one_hour;
+            end loop;
     ELSE
         WHILE (_start_time + span_interval <= _end_time) LOOP
-            IF (NOT (_start_time, _start_time + span_interval) OVERLAPS  (twelve_pm, two_pm)) THEN
-                arr = array_append(arr, _start_time);
-            END IF;
-            _start_time := _start_time + one_hour;
-        end loop;
+                IF (NOT (_start_time, _start_time + span_interval) OVERLAPS  (twelve_pm, two_pm)) THEN
+                    arr = array_append(arr, _start_time);
+                END IF;
+                _start_time := _start_time + one_hour;
+            end loop;
     END IF;
     RETURN arr;
 END;
@@ -39,7 +39,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- Helper function to get the total number of hours that EID have work in that month
-CREATE OR REPLACE FUNCTION get_hours(IN in_eid INT)
+CREATE OR REPLACE FUNCTION get_hours(IN in_eid INT, in date_current DATE)
     RETURNS INT AS $$
 DECLARE
     total_hour int;
@@ -48,7 +48,7 @@ BEGIN
             SELECT SUM(end_time - start_time)
             FROM Sessions S 
             WHERE S.eid = in_eid AND 
-            (SELECT EXTRACT (MONTH FROM S.session_date)) = (SELECT EXTRACT(MONTH FROM CURRENT_DATE))
+            (SELECT EXTRACT (MONTH FROM S.session_date)) = (SELECT EXTRACT(MONTH FROM date_current))
         )), 0) INTO total_hour;
 
     RETURN total_hour;
@@ -98,7 +98,7 @@ BEGIN
                            WHERE S1.eid = Q1.eid
                              AND (((in_start_hour, end_hour) OVERLAPS (S1.start_time - one_hour, S1.end_time + one_hour) AND 
                                     S1.session_date = in_session_date)
-                                OR (SELECT get_hours(Q1.eid)) + span > 30)
+                                OR (SELECT get_hours(Q1.eid, in_session_date)) + span > 30)
                        )
             ),
             R2 AS (SELECT DISTINCT Q2.eid, Q2.name
@@ -140,13 +140,13 @@ BEGIN
                FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN EMPLOYEES) AS Q0
         ),
         R1 AS (SELECT CAST(s_day as date) FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
-        R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
+        R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid, Q2.s_day)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
                FROM (R0 NATURAL JOIN Part_time_instructors CROSS JOIN R1) AS Q2
-               WHERE (SELECT get_hours(Q2.eid)) + span <= 30
+               WHERE (SELECT get_hours(Q2.eid, Q2.s_day)) + span <= 30
                  AND (SELECT EXTRACT(dow FROM Q2.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q2.eid, span, Q2.s_day), 1)) <> 0
         ),
-        R3 AS (SELECT DISTINCT Q3.eid, Q3.name, (SELECT get_hours(Q3.eid)), Q3.s_day, (SELECT check_availability(Q3.eid, span, Q3.s_day))
+        R3 AS (SELECT DISTINCT Q3.eid, Q3.name, (SELECT get_hours(Q3.eid, Q3.s_day)), Q3.s_day, (SELECT check_availability(Q3.eid, span, Q3.s_day))
                FROM (R0 NATURAL JOIN Full_time_instructors CROSS JOIN R1) AS Q3
                WHERE (SELECT EXTRACT(dow FROM Q3.s_day) IN (1,2,3,4,5))
                  AND (array_length(check_availability(Q3.eid, span, Q3.s_day), 1)) <> 0
