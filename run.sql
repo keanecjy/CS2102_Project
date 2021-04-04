@@ -2,6 +2,7 @@
 \i data.sql
 
 \i trigger.sql
+\i triggersession.sql
 \i customer.sql
 \i employee.sql
 \i instructors.sql
