@@ -58,7 +58,7 @@ $$ LANGUAGE plpgsql;
 
 
 
-
+-- Finds all the instructors who could be assigned to teach a course session.
 CREATE OR REPLACE FUNCTION find_instructors(IN in_cid int, IN in_session_date date, IN in_start_hour time)
     RETURNS TABLE (eid int, name text) AS $$
 DECLARE
