@@ -329,7 +329,7 @@ BEGIN
     IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
         RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
-
+    
     -- Check if there is enough slots in the session
     IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) > seat_cap) THEN
         RAISE EXCEPTION 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
@@ -348,13 +348,13 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS valid_session ON Redeems;
 DROP TRIGGER IF EXISTS valid_session ON Registers;
 
-CREATE TRIGGER valid_session
+CREATE CONSTRAINT TRIGGER valid_session
     AFTER INSERT OR UPDATE
     ON Redeems
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();
 
-CREATE TRIGGER valid_session
+CREATE CONSTRAINT TRIGGER valid_session
     AFTER INSERT OR UPDATE
     ON Registers
     FOR EACH ROW

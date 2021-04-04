@@ -32,7 +32,6 @@ BEGIN
             extract (year from buy_date) = _year;
 
         -- Get total registration fees paid using credit card
-        -- TODO: Does total registration fees refer to actual money earned from reg fees or does it include refunded registration fees
         select coalesce(sum(fees), 0) into _total_registration_fees
         from Registers natural join Offerings
         where extract (month from register_date) = _month_val and
@@ -53,7 +52,8 @@ BEGIN
         -- iterate to previous month
         _date_ptr := _date_ptr - interval '1 month';
         N := N - 1;
-        
+       _total_registration_fees := _total_registration_fees + _total_refunded_registration_fees;
+
         return next;
 
     end loop;
@@ -101,13 +101,13 @@ BEGIN
                     from Course_areas
                     where eid = r.eid));
 
-        select count(launch_date) into _course_areas_total
+        select count(launch_date) into _course_offerings_total
         from Manager_offerings_this_year;
 
         -- Table to store total registration fees for each offering
         -- managed by the manager and end this year
         create temp table Manager_offerings_registers as
-            select launch_date, course_id, sum(O.fees) as _offering_registration_fees
+            select launch_date, course_id, coalesce(sum(O.fees), 0) as _offering_registration_fees
             from Manager_offerings_this_year O natural join Registers R
             group by launch_date, course_id;
 
@@ -118,17 +118,18 @@ BEGIN
                 select *
                 from Manager_offerings_this_year natural join Redeems)
            select launch_date, course_id,
-                sum(P.price / P.num_free_registrations) as _offering_redemption_fees
+                coalesce(sum(P.price / P.num_free_registrations), 0) as _offering_redemption_fees
             from Manager_offerings_redeems R natural join Course_packages P
             group by launch_date, course_id;
 
         -- Table to store total net registration fees for each offering
         create temp table Manager_offerings_net_reg_fees as
             select launch_date, course_id,
-                R.offering_registration_fees + P.offering_redemption_fees as _net_reg_fees
-            from Manager_offerings_registers R natural join Manager_offerings_packages P;
+                coalesce(Reg._offering_registration_fees, 0) + coalesce(P._offering_redemption_fees, 0) as _net_reg_fees
+            from Manager_offerings_registers Reg natural full join Manager_offerings_packages P;
 
-        select sum(net_reg_fees) into _net_reg_fees_total
+
+        select coalesce(sum(_net_reg_fees), 0) into _net_reg_fees_total
         from Manager_offerings_net_reg_fees;
 
         _top_course_title := ARRAY(
