@@ -42,7 +42,7 @@ DECLARE
 
 BEGIN
     -- 	Checking validity of course offering information
-    IF (ARRAY_LENGTH(sessions_arr, 1) = 0) THEN
+    IF (ARRAY_LENGTH(sessions_arr, 1) = 0 or l_date < current_date) THEN
         RAISE EXCEPTION 'Course offering details are invalid';
     END IF;
 
@@ -117,16 +117,6 @@ SELECT cust_id, sid, launch_date, course_id, redeem_date
 FROM Redeems;
 
 $$ LANGUAGE sql;
-
--- -- Helper function to query the num of registrations for the offering
--- create or replace function get_num_registration_for_offering(cid int, date_launch date)
---     returns int AS
--- $$
--- select count(*)
--- from combine_reg_redeems()
--- where launch_date = date_launch
---   and course_id = cid;
--- $$ language sql;
 
 
 -- Helper function to query the num of registrations for the session
@@ -261,10 +251,9 @@ CREATE OR REPLACE FUNCTION promote_courses()
             )
 AS
 $$
-WITH InActiveCust AS (SELECT cust_id
-                      FROM Customers
-                               NATURAL JOIN combine_reg_redeems()
-                      GROUP BY cust_id
+WITH InActiveCust AS (SELECT cust_id, name
+                      FROM combine_reg_redeems() NATURAL join Customers
+                      GROUP BY cust_id, name
                       HAVING MAX(register_date) + INTERVAL '5 months' < DATE_TRUNC('month', CURRENT_DATE)),
      CustWithNoOfferings AS (SELECT cust_id, name
                              FROM Customers
@@ -285,14 +274,13 @@ WITH InActiveCust AS (SELECT cust_id
                     launch_date,
                     registration_deadline,
                     fees
-             FROM (CustWithNoOfferings
-                      NATURAL JOIN Customers),
+             FROM CustWithNoOfferings,
                   ValidOfferings
 
              UNION
 
              SELECT cust_id,
-                    (SELECT name FROM Customers WHERE cust_id = R4.cust_id),
+                    name,
                     area_name,
                     course_id,
                     title,
