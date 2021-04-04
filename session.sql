@@ -74,7 +74,7 @@ DECLARE
     second_smallest_date DATE;
     second_largest_date DATE;
 BEGIN
-    SELECT DISTINCT S.session_date into date_of_session FROM Session S where S.sid = in_sid and S.course_id = in_cid and S.launch_date = date_of_launch;
+    SELECT DISTINCT S.session_date into date_of_session FROM Sessions S where S.sid = in_sid and S.course_id = in_cid and S.launch_date = date_of_launch;
     IF (date_of_session <= current_date) THEN
         RAISE EXCEPTION 'Course session has already started';
     END IF;
@@ -99,11 +99,9 @@ BEGIN
     IF (date_of_session = date_of_start) THEN
         SELECT S.session_date into second_smallest_date
         FROM Sessions S
-        WHERE S.sid = in_sid
-          AND S.launch_date = date_of_launch
+        WHERE S.launch_date = date_of_launch
           AND S.course_id = in_cid
-        ORDER BY S.session_date
-        OFFSET 1
+        ORDER BY S.session_date ASC
             LIMIT 1;
 
         UPDATE Offerings
@@ -115,11 +113,9 @@ BEGIN
     IF (date_of_session = date_of_end) THEN
         SELECT S.session_date into second_largest_date
         FROM Sessions S
-        WHERE S.sid = in_sid
-          AND S.launch_date = date_of_launch
+        WHERE S.launch_date = date_of_launch
           AND S.course_id = in_cid
         ORDER BY S.Session_date DESC
-        OFFSET 1
             LIMIT 1;
 
         UPDATE Offerings
