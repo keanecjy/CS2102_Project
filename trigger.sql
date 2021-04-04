@@ -177,10 +177,12 @@ DECLARE
     one_hour interval := concat(1, ' hours')::interval;
 BEGIN
     -- VALIDATE AT MOST ONE COURSE SESSION AT ANY HOUR AND NOT TEACH 2 CONSECUTIVE SESSIONS
-    IF (EXISTS(SELECT 1 FROM Sessions S WHERE S.session_date = NEW.session_date AND S.eid = NEW.eid
-                                          AND (NEW.start_time, NEW.end_time) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour))) THEN
+    IF ( 1 < (
+        SELECT count(*) 
+        FROM Sessions S 
+        WHERE S.session_date = NEW.session_date AND S.eid = NEW.eid AND (NEW.start_time, NEW.end_time) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour))) THEN
+
         RAISE EXCEPTION 'This instructor is either teaching in this timing or he is having consecutive sessions!';
-        RETURN NULL;
     END IF;
     RETURN NEW;
 END;
@@ -188,8 +190,8 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS instructors_overlap_timing_checks on Sessions;
 
-CREATE TRIGGER instructors_overlap_timing_checks
-BEFORE INSERT OR UPDATE ON Sessions
+CREATE CONSTRAINT TRIGGER instructors_overlap_timing_checks
+AFTER INSERT OR UPDATE ON Sessions
 FOR EACH ROW EXECUTE FUNCTION instructors_overlap_timing_checks();
 
 
