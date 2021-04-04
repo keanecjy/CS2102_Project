@@ -150,6 +150,7 @@ CREATE TABLE Offerings
 
     primary key (launch_date, course_id),
     CONSTRAINT correct_sequential_dates check (
+        current_date <= launch_date and
         launch_date <= registration_deadline and
         registration_deadline <= start_date and 
         start_date <= end_date

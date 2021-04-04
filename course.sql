@@ -54,7 +54,7 @@ BEGIN
     INSERT INTO Offerings VALUES (l_date, cid, reg_deadline, NULL, NULL, admin_id, 0, 0, fees);
 
     -- Adding each session in
-    FOREACH temp slice 1 IN ARRAY sessions_arr
+    FOREACH temp SLICE 1 IN ARRAY sessions_arr
         LOOP
             s_date := temp[1]::date;
             s_time := temp[2]::time;
@@ -74,7 +74,8 @@ BEGIN
             SELECT eid INTO inst_eid FROM find_instructors(cid, s_date, s_time) LIMIT 1;
 
             INSERT INTO Sessions
-            VALUES (next_sid, l_date, cid, s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid, inst_eid);
+            VALUES (next_sid, l_date, cid, s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid,
+                    inst_eid);
 
             seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
             inst_eid := NULL;
