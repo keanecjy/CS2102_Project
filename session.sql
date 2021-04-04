@@ -26,12 +26,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE PROCEDURE remove_session(in_cid INT, date_of_launch DATE, in_sid INT)
 AS $$
-BEGIN
     -- deletes
     DELETE FROM Sessions S
     WHERE S.course_id = in_cid
       AND S.sid = in_sid
       AND S.launch_date = date_of_launch;
-
-END;
+    
 $$ LANGUAGE sql;
