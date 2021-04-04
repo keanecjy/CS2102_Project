@@ -96,19 +96,24 @@ BEGIN
           AND R.course_id = in_cid
           AND R.launch_date = date_of_launch;
         
-        INSERT INTO Cancels VALUES (current_date, null, 1, cus_id, sid_redeem, date_of_launch, in_cid);
+        INSERT INTO Cancels VALUES (now(), null, 1, cus_id, sid_redeem, date_of_launch, in_cid);
     ELSE
-        -- DELETE FROM registers
         DELETE FROM Registers R
         WHERE R.cust_id = cus_id
           AND R.course_id = in_cid
           AND R.launch_date = date_of_launch;
         
+        SELECT S.session_date INTO date_of_session
+        FROM Sessions S
+        WHERE S.sid = sid_register
+            AND S.course_id = in_cid
+            AND S.launch_date = date_of_launch;
+
         IF (current_date + 7 <= date_of_session) THEN
             select fees into cost FROM Offerings WHERE course_id = in_cid AND launch_date = date_of_launch;
-            INSERT INTO Cancels VALUES (current_date, 0.9 * cost, null, cus_id, sid_register, date_of_launch, in_cid);
+            INSERT INTO Cancels VALUES (now(), 0.9 * cost, null, cus_id, sid_register, date_of_launch, in_cid);
         ELSE
-            INSERT INTO Cancels VALUES (current_date, 0, null, cus_id, sid_register, date_of_launch, in_cid);
+            INSERT INTO Cancels VALUES (now(), 0, null, cus_id, sid_register, date_of_launch, in_cid);
         end if;
     END IF;
 END;

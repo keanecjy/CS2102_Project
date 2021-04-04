@@ -1,4 +1,5 @@
 \i schema.sql
+\i data.sql
 
 \i trigger.sql
 \i customer.sql
