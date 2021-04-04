@@ -153,20 +153,11 @@ WITH NumRegistered AS (SELECT course_id, launch_date, COUNT(*) AS numReg
 SELECT title, area_name, start_date, end_date, registration_deadline, fees, seating_capacity - COALESCE(numReg, 0)
 FROM (Courses NATURAL JOIN Offerings)
          NATURAL LEFT JOIN NumRegistered
-WHERE start_date >= CURRENT_DATE
+WHERE registration_deadline >= CURRENT_DATE
   AND seating_capacity - COALESCE(numReg, 0) > 0;
 
 $$ LANGUAGE sql;
 
-
-/*
-
-         title         |      area_name       | start_date |  end_date  | registration_deadline | fees  | remaining_seats
-----------------------+----------------------+------------+------------+-----------------------+-------+-----------------
- Software Engineering | Software Engineering | 2021-04-08 | 2021-04-08 | 2021-03-27            | 55.65 |             250
-(1 row)
-
- */
 
 -- Q16
 -- Retrieve all the available sessions for a course offering that could be registered.
@@ -190,13 +181,6 @@ WHERE course_id = cid
 
 $$ LANGUAGE sql;
 
-/*
- cs2102=> select get_available_course_sessions(2102, '2/13/2021');
-        get_available_course_sessions
----------------------------------------------
- (2021-04-19,11:00:00,"Brandie Ziemens",200)
-(1 row)
- */
 
 /*
 Q19
