@@ -136,7 +136,8 @@ BEGIN
             from Courses
             where course_id in (
                 select course_id
-                from Manager_offerings_net_reg_fees));
+                from Manager_offerings_net_reg_fees
+                where _net_reg_fees in (select max(_net_reg_fees) from Manager_offerings_net_reg_fees)));
 
         return next;
 
