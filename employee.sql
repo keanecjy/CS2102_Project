@@ -211,3 +211,13 @@ BEGIN
     close curs;
 END;
 $$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION is_departed(emp_id int)
+RETURNS boolean AS $$
+BEGIN
+    RETURN coalesce((select depart_date from Employees where emp_id = eid), current_date + 10) < current_date;
+END;
+$$ LANGUAGE plpgsql;
+
+
