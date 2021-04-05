@@ -73,19 +73,19 @@ FOR EACH ROW EXECUTE FUNCTION insert_employee_cat_check();
 CREATE OR REPLACE FUNCTION update_or_delete_employee_cat_check()
 RETURNS TRIGGER AS $$
 BEGIN
-    if TG_TABLE_NAME = 'Part_time_instructors' then
+    if TG_TABLE_NAME = 'part_time_instructors' then
         if old.eid in (select eid from Instructors) or
             old.eid in (select eid from Part_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Part-time instructor % still exists in referenced tables.', old.eid;
         end if;
-    elseif TG_TABLE_NAME = 'Full_time_instructors' then
+    elseif TG_TABLE_NAME = 'full_time_instructors' then
          if old.eid in (select eid from Instructors) or
             old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Full-time instructor % still exists in referenced tables.', old.eid;
         end if;
-    elseif TG_TABLE_NAME = 'Administrators' then
+    elseif TG_TABLE_NAME = 'administrators' then
          if old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Administrator % still exists in referenced tables.', old.eid;
@@ -276,13 +276,13 @@ EXECUTE FUNCTION update_employee_departure();
 CREATE OR REPLACE FUNCTION at_least_one_specialization()
 RETURNS TRIGGER AS $$
 BEGIN
-    if TG_OP = 'INSERT' and TG_TABLE_NAME = 'Instructors' THEN
+    if TG_OP = 'INSERT' THEN
         if new.eid not in (select eid from Specializes) then
             raise exception 'Instructor % must specialise in at least one course area.', new.eid;
         end if;
     end if;
 
-    if (TG_OP = 'UPDATE' or TG_OP 'DELETE') and TG_TABLE_NAME = 'Specializes' then
+    if TG_OP = 'UPDATE' or TG_OP = 'DELETE' then
         if old.eid in (select eid from Instructors) and
             old.eid not in (select eid from Specializes) then
             raise exception 'Instructor % must specialise in at least one course area.', old.eid;
@@ -296,12 +296,12 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS at_least_one_specialization on Instructors;
 DROP TRIGGER IF EXISTS at_least_one_specialization on Specializes;
 
-CREATE TRIGGER at_least_one_specialization
-AFTER INSERT ON Instructors
+CREATE CONSTRAINT TRIGGER at_least_one_specialization
+AFTER INSERT ON Instructors DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION at_least_one_specialization();
 
-CREATE TRIGGER at_least_one_specialization
-AFTER UPDATE OR DELETE ON Specializes
+CREATE CONSTRAINT TRIGGER at_least_one_specialization
+AFTER UPDATE OR DELETE ON Specializes DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION at_least_one_specialization();
 
 

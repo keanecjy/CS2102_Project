@@ -29,13 +29,15 @@ BEGIN
         end if;
     elseif _employee_cat in ('Manager') then
         -- the set of course area can be empty as a manager can manage zero course area
-        foreach _area_name in array _course_areas
-        loop
-            -- the course area cannot be managed by another manager
-            if _area_name in (select area_name from Course_areas) then
-                raise exception '% is managed by another manager.', _area_name;
-            end if;
-        end loop;
+        if _course_areas is not null then
+            foreach _area_name in array _course_areas
+            loop
+                -- the course area cannot be managed by another manager
+                if _area_name in (select area_name from Course_areas) then
+                    raise exception '% is managed by another manager.', _area_name;
+                end if;
+            end loop;
+        end if;
    else -- instructor
         if _course_areas is null then
             raise exception 'The set of course areas cannot be empty for an instructor.';
@@ -57,11 +59,13 @@ BEGIN
         insert into Managers
         values (_eid);
 
-        foreach _area_name in array _course_areas
-        loop
-            insert into Course_areas
-            values (_area_name, _eid);
-        end loop;
+        if _course_areas is not null then
+            foreach _area_name in array _course_areas
+            loop
+                insert into Course_areas
+                values (_area_name, _eid);
+            end loop;
+        end if;
     elseif _employee_cat = 'Administrator' then
         insert into Full_time_emp
         values (_eid, _salary_info); -- assumed to be monthly salary
@@ -140,7 +144,7 @@ BEGIN
         _eid := r.eid;
         _name := r.name;
 
-        if _eid not in (select eid from Employees where depart_date < make_date(1, _pay_month, _pay_year)) then
+        if _eid not in (select eid from Employees where depart_date < make_date(_pay_year, _pay_month, 1)) then
             if _eid in (select eid from Part_time_emp) then
                 _status := 'Part-time';
                 _num_work_days := null;
