@@ -62,9 +62,6 @@ BEGIN
     from Course_packages C
     where C.package_id = pid;
 
-    --  at_most_one_package trigger on Buys ensures at most one (partially) active package
-    set constraints at_most_one_package immediate;
-
     -- buying course package
     insert into Buys
     values (current_date, cid, active_card.card_number, pid, n_redemptions);

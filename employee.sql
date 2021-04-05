@@ -27,7 +27,7 @@ BEGIN
         if _course_areas is not null then
             raise exception 'The set of course areas must be empty for an administrator.';
         end if;
-    elseif _employee_cat in ('Manager') then
+    elsif _employee_cat in ('Manager') then
         -- the set of course area can be empty as a manager can manage zero course area
         if _course_areas is not null then
             foreach _area_name in array _course_areas
@@ -66,13 +66,13 @@ BEGIN
                 values (_area_name, _eid);
             end loop;
         end if;
-    elseif _employee_cat = 'Administrator' then
+    elsif _employee_cat = 'Administrator' then
         insert into Full_time_emp
         values (_eid, _salary_info); -- assumed to be monthly salary
 
         insert into Administrators
         values (_eid);
-    elseif _employee_cat = 'Part-time instructor' then
+    elsif _employee_cat = 'Part-time instructor' then
         insert into Part_time_emp
         values (_eid, _salary_info); -- assumed to be hourly rate
 

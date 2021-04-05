@@ -47,10 +47,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS insert_employee_cat_check on Employees;
-
 CREATE CONSTRAINT TRIGGER insert_employee_cat_check
-AFTER INSERT ON Employees DEFERRABLE INITIALLY DEFERRED
+AFTER INSERT OR UPDATE ON Employees DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION insert_employee_cat_check();
 
 
@@ -73,38 +71,45 @@ FOR EACH ROW EXECUTE FUNCTION insert_employee_cat_check();
 CREATE OR REPLACE FUNCTION update_or_delete_employee_cat_check()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- If there is no change to eid, ignore the constraint check
+    if (TG_OP = 'UPDATE' AND OLD.eid = NEW.eid) THEN
+        return null;
+    end if;
+
     if TG_TABLE_NAME = 'part_time_instructors' then
         if old.eid in (select eid from Instructors) or
             old.eid in (select eid from Part_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Part-time instructor % still exists in referenced tables.', old.eid;
         end if;
-    elseif TG_TABLE_NAME = 'full_time_instructors' then
-         if old.eid in (select eid from Instructors) or
+        return null;
+    elsif TG_TABLE_NAME = 'full_time_instructors' then
+        if old.eid in (select eid from Instructors) or
             old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Full-time instructor % still exists in referenced tables.', old.eid;
         end if;
-    elseif TG_TABLE_NAME = 'administrators' then
-         if old.eid in (select eid from Full_time_emp) or
+        return null;
+    elsif TG_TABLE_NAME = 'administrators' then
+        if old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Administrator % still exists in referenced tables.', old.eid;
         end if; 
-    else -- Managers
-         if old.eid in (select eid from Full_time_emp) or
+        
+        return null;
+    elsif TG_TABLE_NAME = 'managers' then
+        if old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Manager % still exists in referenced tables.', old.eid;
         end if;
+        
+        return null;
+    else
+        raise exception 'Internal error in update_or_delete_employee_cat_check';
     end if;
 
-    return null;
 END;
 $$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Part_time_instructors;
-DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Full_time_instructors;
-DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Administrators;
-DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Managers;
 
 CREATE CONSTRAINT TRIGGER update_or_delete_employee_cat_check
 AFTER UPDATE OR DELETE ON Part_time_instructors DEFERRABLE INITIALLY DEFERRED
@@ -140,10 +145,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS part_time_emp_check on Part_time_emp;
-
 CREATE CONSTRAINT TRIGGER part_time_emp_check
-AFTER INSERT ON Part_time_emp DEFERRABLE INITIALLY DEFERRED
+AFTER INSERT OR UPDATE ON Part_time_emp DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION part_time_emp_check();
 
 
@@ -180,10 +183,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS full_time_emp_check on Full_time_emp;
-
 CREATE CONSTRAINT TRIGGER full_time_emp_check
-AFTER INSERT ON Full_time_emp DEFERRABLE INITIALLY DEFERRED
+AFTER INSERT OR UPDATE ON Full_time_emp DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION full_time_emp_check();
 
 
@@ -216,10 +217,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS instructor_check on Instructors;
-
 CREATE CONSTRAINT TRIGGER instructor_check
-AFTER INSERT ON Instructors DEFERRABLE INITIALLY DEFERRED
+AFTER INSERT OR UPDATE ON Instructors DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION instructor_check();
 
 
@@ -232,6 +231,11 @@ FOR EACH ROW EXECUTE FUNCTION instructor_check();
 CREATE OR REPLACE FUNCTION update_employee_departure()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- If departure date is already null, ignore the constraint check
+    if (TG_OP = 'UPDATE' AND OLD.depart_date is not null) THEN
+        return new;
+    end if;
+
     -- condition 1
     if new.eid in (select eid from Administrators)
         and new.depart_date < any (
@@ -241,7 +245,7 @@ BEGIN
         raise notice 'Departure date for employee id % is not updated as the administrator is handling some course offering where its registration deadline is after the departure date.', new.eid;
         return null;
     -- condition 2
-    elseif new.eid in (select eid from Instructors)
+    elsif new.eid in (select eid from Instructors)
         and new.depart_date < any (
             select session_date
             from Sessions
@@ -249,7 +253,7 @@ BEGIN
        raise notice 'Departure date for employee id % is not updated as the instructor is teaching some course session that starts after the departure date.', new.eid;
        return null;
     -- condition 3
-    elseif new.eid in (select eid from Managers)
+    elsif new.eid in (select eid from Managers)
         and new.eid in (select eid from Course_areas) then
         raise notice 'Departure date for employee id % is not updated as the manager is still managing some course area.', new.eid;
         return null;
@@ -259,10 +263,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS update_employee_departure ON Employees;
-
 CREATE TRIGGER update_employee_departure
-BEFORE UPDATE ON Employees
+BEFORE INSERT OR UPDATE ON Employees
 FOR EACH ROW WHEN (new.depart_date is not null)
 EXECUTE FUNCTION update_employee_departure();
 
@@ -276,13 +278,11 @@ EXECUTE FUNCTION update_employee_departure();
 CREATE OR REPLACE FUNCTION at_least_one_specialization()
 RETURNS TRIGGER AS $$
 BEGIN
-    if TG_OP = 'INSERT' THEN
-        if new.eid not in (select eid from Specializes) then
+    if TG_TABLE_NAME = 'instructors' then
+        IF (new.eid not in (select eid from Specializes)) then
             raise exception 'Instructor % must specialise in at least one course area.', new.eid;
-        end if;
-    end if;
-
-    if TG_OP = 'UPDATE' or TG_OP = 'DELETE' then
+        END IF;
+    else
         if old.eid in (select eid from Instructors) and
             old.eid not in (select eid from Specializes) then
             raise exception 'Instructor % must specialise in at least one course area.', old.eid;
@@ -293,11 +293,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS at_least_one_specialization on Instructors;
-DROP TRIGGER IF EXISTS at_least_one_specialization on Specializes;
-
 CREATE CONSTRAINT TRIGGER at_least_one_specialization
-AFTER INSERT ON Instructors DEFERRABLE INITIALLY DEFERRED
+AFTER INSERT OR UPDATE ON Instructors DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION at_least_one_specialization();
 
 CREATE CONSTRAINT TRIGGER at_least_one_specialization
@@ -310,25 +307,33 @@ FOR EACH ROW EXECUTE FUNCTION at_least_one_specialization();
  * Constraint trigger on Credit_cards
  *  -> to enforce total participation, every customer have at least one card
  */
-
 CREATE OR REPLACE FUNCTION at_least_one_card()
 RETURNS TRIGGER AS $$
+DECLARE
+    rec RECORD;
 BEGIN
-    IF (NOT EXISTS(SELECT 1 FROM Credit_cards WHERE cust_id = OLD.cust_id)
-        AND EXISTS(SELECT 1 FROM Customers WHERE cust_id = OLD.cust_id)) THEN
+    IF TG_TABLE_NAME = 'customers' THEN
+        rec = NEW;
+    ELSIF TG_TABLE_NAME = 'credit_cards' THEN
+        rec = OLD;
+    END IF;
+
+    IF (NOT EXISTS(SELECT 1 FROM Credit_cards WHERE cust_id = rec.cust_id)
+        AND EXISTS(SELECT 1 FROM Customers WHERE cust_id = rec.cust_id)) THEN
         RAISE EXCEPTION 'Sorry, customer id % must have at least one credit card', OLD.cust_id;
     END IF;
 
-    RETURN OLD;
+    RETURN rec;
 END;
 $$ language plpgsql;
 
+CREATE CONSTRAINT TRIGGER at_least_one_card
+AFTER INSERT OR UPDATE ON Customers DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION at_least_one_card();
 
-DROP TRIGGER IF EXISTS at_least_one_card on Credit_cards;
-
-CREATE CONSTRAINT TRIGGER at_least_one_card AFTER DELETE OR UPDATE ON Credit_cards
-FOR EACH ROW
-EXECUTE FUNCTION at_least_one_card();
+CREATE CONSTRAINT TRIGGER at_least_one_card
+AFTER DELETE OR UPDATE ON Credit_cards DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION at_least_one_card();
 
 
 
@@ -366,12 +371,9 @@ BEGIN
 END;
 $$ language plpgsql;
 
-
-DROP TRIGGER IF EXISTS at_most_one_package on Buys;
-
-CREATE CONSTRAINT TRIGGER at_most_one_package AFTER INSERT OR UPDATE ON Buys
-FOR EACH ROW
-EXECUTE FUNCTION at_most_one_package();
+CREATE CONSTRAINT TRIGGER at_most_one_package
+AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY IMMEDIATE
+FOR EACH ROW EXECUTE FUNCTION at_most_one_package();
 
 
 
@@ -438,10 +440,6 @@ BEGIN
     RETURN new;
 END;
 $$ LANGUAGE plpgsql;
-
-
-DROP TRIGGER IF EXISTS valid_session ON Redeems;
-DROP TRIGGER IF EXISTS valid_session ON Registers;
 
 CREATE CONSTRAINT TRIGGER valid_session
     AFTER INSERT OR UPDATE

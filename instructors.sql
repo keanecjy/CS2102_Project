@@ -173,8 +173,9 @@ AS $$
 DECLARE
     s_date date; -- session date
     s_time time;
+    prev_eid int;
 BEGIN
-    SELECT S.session_date, S.start_time into s_date, s_time 
+    SELECT S.session_date, S.start_time, S.eid into s_date, s_time, prev_eid 
     FROM Sessions S 
     WHERE S.sid = in_sid AND S.launch_date = date_of_launch AND S.course_id = in_cid;
 
@@ -185,7 +186,7 @@ BEGIN
     UPDATE Sessions
     SET eid = new_eid
     WHERE (sid, launch_date, course_id) = (in_sid, date_of_launch, in_cid) AND 
-        eid = (SELECT S1.eid FROM Sessions S1 WHERE S1.course_id = in_cid AND S1.sid = in_sid AND S1.launch_date = date_of_launch);
+        eid = prev_eid;
 END;
 $$ LANGUAGE plpgsql;
 

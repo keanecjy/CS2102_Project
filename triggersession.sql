@@ -60,7 +60,7 @@ BEGIN
 
     -- VALIDATE PART-TIME INSTRUCTOR
     IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((SELECT get_hours(NEW.eid, NEW.session_date)) + span > 30)) THEN
-        RAISE EXCEPTION 'This part-time instructor is going to be OVERWORKED if he take this session!';
+        RAISE EXCEPTION 'Part-time instructor % is going to be OVERWORKED if he take this session!', NEW.eid;
         RETURN NULL;
     END IF;
     RETURN NEW;
@@ -158,7 +158,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER delete_session_checks
-    BEFORE DELETE OR UPDATE ON Sessions
+    AFTER DELETE OR UPDATE ON Sessions
     FOR EACH ROW EXECUTE FUNCTION delete_session_checks();
 
 
@@ -264,7 +264,7 @@ BEGIN
         (SELECT COUNT(*) FROM Sessions S WHERE S.launch_date = OLD.launch_date AND S.course_id = OLD.course_id) = 0) THEN
         RAISE EXCEPTION  'You cannot do this as there will be no more session left for course offering: %', OLD.course_id;
     END IF;
-    RETURN OLD;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
