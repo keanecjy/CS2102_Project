@@ -55,8 +55,8 @@ RETURNS TABLE(_rid int, _room_capacity int, _day date, _available_hours time[]) 
 DECLARE
     curs cursor for (select * from Rooms order by rid);
     r record;
-    _hours_array int[];
-    _hour int;
+    _hours_array time[];
+    _hour time;
     _loop_date date;
     _temp_start_hour time;
     _temp_end_hour time;
@@ -66,7 +66,7 @@ BEGIN
         raise exception 'The start date cannot be after the end date.';
     end if;
 
-    _hours_array := '{time 09:00, time 10:00, time 11:00, time 14:00, time 15:00, time 16:00, time 17:00}';
+    _hours_array := array[time '09:00', time '10:00', time '11:00', time '14:00', time '15:00', time '16:00', time '17:00'];
 
     open curs;
     -- loop each rid
