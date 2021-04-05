@@ -51,7 +51,8 @@ INSERT INTO Employees (eid, name, phone, email, address, join_date) VALUES
 (42, 'manager4pt', '12312312', 'man@nus.edu.sg', 'sad tree2', '8/20/2020'),
 (43, 'admin4pt', '12341234', 'adminpt@nus.edu.sg', 'sad tree3', '7/20/2020'),
 (44, 'mr part-time free', '44443333', '44443333@nus.edu.sg', 'sad tree4', '10/20/2020'),
-(45, 'mr full-time free', '54443333', '54443333@nus.edu.sg', 'sad tree5', '10/20/2020');
+(45, 'mr full-time free', '54443333', '54443333@nus.edu.sg', 'sad tree5', '10/20/2020'),
+(46, 'useless guy', '54443334', '54443334@nus.edu.sg', 'sad tree6', '10/20/2020');
 
 INSERT INTO Part_time_emp (eid, hourly_rate) VALUES
 (4, 14.50), (7, 8.00), (9, 10.80), (10, 16.00), (12, 12.00),
@@ -61,7 +62,7 @@ INSERT INTO Part_time_emp (eid, hourly_rate) VALUES
 INSERT INTO Full_time_emp (eid, monthly_salary) VALUES
 -- Full-time instructors
 (2, 5450), (14, 6010), (20, 3800), (25, 2450), (31, 8120),
-(35, 3450), (36, 3650), (38, 4100), (39, 4210), (40, 7754), (45, 9999),
+(35, 3450), (36, 3650), (38, 4100), (39, 4210), (40, 7754), (45, 9999), (46, 1),
 -- Administrators
 (1, 5400), (3, 5830), (5, 4590), (6, 3390), (15, 5480),
 (17, 5000), (26, 4100), (28, 4000), (32, 3800), (33, 6100), (43, 1000),
@@ -72,7 +73,7 @@ INSERT INTO Full_time_emp (eid, monthly_salary) VALUES
 
 INSERT INTO Instructors (eid) VALUES
 (2), (4), (7), (9), (10), (12), (14), (20), (21), (23), 
-(24), (25), (29), (31), (35), (36), (37), (38), (39), (40), (41), (44), (45);
+(24), (25), (29), (31), (35), (36), (37), (38), (39), (40), (41), (44), (45), (46);
 
 
 INSERT INTO Part_time_instructors (eid) VALUES
@@ -80,7 +81,7 @@ INSERT INTO Part_time_instructors (eid) VALUES
 
 
 INSERT INTO Full_time_instructors (eid) VALUES
-(2), (14), (20), (25), (31), (35), (36), (38), (39), (40), (45);
+(2), (14), (20), (25), (31), (35), (36), (38), (39), (40), (45), (46);
 
 
 INSERT INTO Administrators (eid) VALUES
@@ -146,7 +147,8 @@ INSERT INTO Specializes (eid, area_name) VALUES
 (39, 'Artificial Intelligence'), (40, 'Database Systems'),
 (41, 'course1'), (41, 'course2'), (41, 'course3'), (41, 'course4'),(41, 'course5'), (41, 'course6'),
 (44, 'course1'), (44, 'course2'), (44, 'course3'), (44, 'course4'),(44, 'course5'), (44, 'course6'),
-(45, 'course1'), (45, 'course2'), (45, 'course3'), (45, 'course4'),(45, 'course5'), (45, 'course6');
+(45, 'course1'), (45, 'course2'), (45, 'course3'), (45, 'course4'),(45, 'course5'), (45, 'course6'),
+(46, 'course1'), (46, 'course2'), (46, 'course3'), (46, 'course4'),(46, 'course5'), (46, 'course6');
 
 
 INSERT INTO Courses (course_id, title, description, area_name, duration) VALUES

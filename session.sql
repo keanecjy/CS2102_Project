@@ -15,9 +15,8 @@ DECLARE
     span interval;
 BEGIN
     SELECT DISTINCT concat(duration, ' hours')::interval INTO span
-    FROM Offerings natural join Courses
-    WHERE course_id = in_cid
-      AND launch_date = date_of_launch;
+    FROM Courses
+    WHERE course_id = in_cid;
 
     INSERT INTO Sessions VALUES (session_number, date_of_launch, in_cid, in_session_date, in_start_hour, in_start_hour + span, in_rid, in_eid);
 
