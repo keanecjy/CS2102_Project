@@ -1,4 +1,230 @@
 /**
+ * Constraint trigger on Employees after insertion
+ * -> to enforce covering and no overlap constraint:
+ * an employee must be a part-time or full-time employee
+ * -> to enforce that an employee is either an instructor, administrator or manager
+ */
+CREATE OR REPLACE FUNCTION insert_employee_cat_check()
+RETURNS TRIGGER AS $$
+DECLARE
+    emp_count int; -- count occurrence of employee in Part_time_emp and Full_time_emp
+    emp_type_count int; -- count occurrence of employee in Instructors, Administrators and Managers
+BEGIN
+    emp_count := 0;
+    emp_type_count := 0;
+
+    -- check emp_count
+    if new.eid in (select eid from Part_time_emp) then
+        emp_count := emp_count + 1;
+    end if;
+
+    if new.eid in (select eid from Full_time_emp) then
+       emp_count := emp_count + 1;
+    end if;
+
+    if emp_count <> 1 then
+        raise exception 'Employee % must be in either Part_time_emp or Full_time_emp table.', new.eid;
+   end if;
+
+    -- check emp_type_count
+    if new.eid in (select eid from Instructors) then
+        emp_type_count := emp_type_count + 1;
+    end if;
+
+    if new.eid in (select eid from Administrators) then
+        emp_type_count := emp_type_count + 1;
+    end if;
+
+    if new.eid in (select eid from Managers) then
+        emp_type_count := emp_type_count + 1;
+    end if;
+
+    if emp_type_count <> 1 then
+        raise exception 'Employee % must be in either Instructors, Administrators or Managers table.', new.eid;
+    end if;
+
+    return new;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS insert_employee_cat_check on Employees;
+
+CREATE CONSTRAINT TRIGGER insert_employee_cat_check
+AFTER INSERT ON Employees DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION insert_employee_cat_check();
+
+
+
+/**
+ * Constraint trigger on Part_time_instructors, Full_time_instructors,
+ * Administrators and Managers after update or delete
+ * -> to enforce that the old employee before update or delete is NOT in:
+ *    1) Employees table AND
+ *    2) either Part_time_emp or Full_time_emp table AND
+ *    3) Instructors table if old employee is a part-time or full-time instructor
+ *
+ * NOTE: updating or deleting from Part_time_emp, Full_time_emp and Instructors
+ * are not checked as:
+ * 1) there will be a violation of foreign key constraint if there is a referenced tuple
+ *    in either Part_time_instructors, Full_time_instructors, Administrators or Managers
+ * 2) any update or delete from  Part_time_instructors, Full_time_instructors, Administrators
+ *    or Managers must also be updated / deleted in its referencing tables
+ */
+CREATE OR REPLACE FUNCTION update_or_delete_employee_cat_check()
+RETURNS TRIGGER AS $$
+BEGIN
+    if TG_TABLE_NAME = 'Part_time_instructors' then
+        if old.eid in (select eid from Instructors) or
+            old.eid in (select eid from Part_time_emp) or
+            old.eid in (select eid from Employees) then
+            raise exception 'Part-time instructor % still exists in referenced tables.', old.eid;
+        end if;
+    elseif TG_TABLE_NAME = 'Full_time_instructors' then
+         if old.eid in (select eid from Instructors) or
+            old.eid in (select eid from Full_time_emp) or
+            old.eid in (select eid from Employees) then
+            raise exception 'Full-time instructor % still exists in referenced tables.', old.eid;
+        end if;
+    elseif TG_TABLE_NAME = 'Administrators' then
+         if old.eid in (select eid from Full_time_emp) or
+            old.eid in (select eid from Employees) then
+            raise exception 'Administrator % still exists in referenced tables.', old.eid;
+        end if; 
+    else -- Managers
+         if old.eid in (select eid from Full_time_emp) or
+            old.eid in (select eid from Employees) then
+            raise exception 'Manager % still exists in referenced tables.', old.eid;
+        end if;
+    end if;
+
+    return null;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Part_time_instructors;
+DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Full_time_instructors;
+DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Administrators;
+DROP TRIGGER IF EXISTS update_or_delete_employee_cat_check on Managers;
+
+CREATE CONSTRAINT TRIGGER update_or_delete_employee_cat_check
+AFTER UPDATE OR DELETE ON Part_time_instructors DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION update_or_delete_employee_cat_check();
+
+CREATE CONSTRAINT TRIGGER update_or_delete_employee_cat_check
+AFTER UPDATE OR DELETE ON Full_time_instructors DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION update_or_delete_employee_cat_check();
+
+CREATE CONSTRAINT TRIGGER update_or_delete_employee_cat_check
+AFTER UPDATE OR DELETE ON Administrators DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION update_or_delete_employee_cat_check();
+
+CREATE CONSTRAINT TRIGGER update_or_delete_employee_cat_check
+AFTER UPDATE OR DELETE ON Managers DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION update_or_delete_employee_cat_check();
+
+
+
+/**
+ * Constraint trigger on Part_time_emp
+ * -> to enforce covering and no overlap constraint:
+ * a part-time employee is a part-time instructor
+ */
+CREATE OR REPLACE FUNCTION part_time_emp_check()
+RETURNS TRIGGER AS $$
+BEGIN
+    if new.eid not in (select eid from Part_time_instructors) then
+        raise exception 'Part-time employee % must be in Part_time_instructors table.', new.eid;
+    end if;
+
+    return new;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS part_time_emp_check on Part_time_emp;
+
+CREATE CONSTRAINT TRIGGER part_time_emp_check
+AFTER INSERT ON Part_time_emp DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION part_time_emp_check();
+
+
+
+/**
+ * Constraint trigger on Full_time_emp
+ * -> to enforce covering and no overlap constraint:
+ * a full-time employee is either a full-time instructor, administrator or manager
+ */
+CREATE OR REPLACE FUNCTION full_time_emp_check()
+RETURNS TRIGGER AS $$
+DECLARE
+    full_time_count int; -- count occurrence of full-time employee in Full_time_instructors, Administrators and Managers
+BEGIN
+    full_time_count := 0;
+
+    if new.eid in (select eid from Full_time_instructors) then
+        full_time_count := full_time_count + 1;
+    end if;
+
+    if new.eid in (select eid from Administrators) then
+        full_time_count := full_time_count + 1;
+    end if;
+
+    if new.eid in (select eid from Managers) then
+        full_time_count := full_time_count + 1;
+    end if;
+
+    if full_time_count <> 1 then
+        raise exception 'Full-time employee % must be in either Full_time_instructors, Administrators or Managers table.', new.eid;
+    end if;
+
+    return new;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS full_time_emp_check on Full_time_emp;
+
+CREATE CONSTRAINT TRIGGER full_time_emp_check
+AFTER INSERT ON Full_time_emp DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION full_time_emp_check();
+
+
+
+/**
+ * Constraint trigger on Instructors
+ * -> to enforce covering and no overlap constraint:
+ * an instructor is either a part-time or full-time instructor
+ */
+CREATE OR REPLACE FUNCTION instructor_check()
+RETURNS TRIGGER AS $$
+DECLARE
+    inst_count int;
+BEGIN
+    inst_count := 0;
+
+    if new.eid in (select eid from Part_time_instructors) then
+        inst_count := inst_count + 1;
+    end if;
+
+    if new.eid in (select eid from Full_time_instructors) then
+        inst_count := inst_count + 1;
+    end if;
+
+    if inst_count <> 1 then
+        raise exception 'Instructor % must be in either Part_time_instructors or Full_time_instructors table.', new.eid;
+    end if;
+
+    return new;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS instructor_check on Instructors;
+
+CREATE CONSTRAINT TRIGGER instructor_check
+AFTER INSERT ON Instructors DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION instructor_check();
+
+
+
+/**
  * Constraint trigger on Employees
  * -> to enforce valid update of an employee's departure date
  * condition for validity is from function 2 (remove_employee)
@@ -35,9 +261,48 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS update_employee_departure ON Employees;
 
-CREATE TRIGGER update_employee_departure BEFORE UPDATE ON Employees
+CREATE TRIGGER update_employee_departure
+BEFORE UPDATE ON Employees
 FOR EACH ROW WHEN (new.depart_date is not null)
 EXECUTE FUNCTION update_employee_departure();
+
+
+
+/**
+ * Constraint trigger on Instructors
+ * -> to enforce total participation:
+ * every instructor has >= 1 specialization
+ */
+CREATE OR REPLACE FUNCTION at_least_one_specialization()
+RETURNS TRIGGER AS $$
+BEGIN
+    if TG_OP = 'INSERT' and TG_TABLE_NAME = 'Instructors' THEN
+        if new.eid not in (select eid from Specializes) then
+            raise exception 'Instructor % must specialise in at least one course area.', new.eid;
+        end if;
+    end if;
+
+    if (TG_OP = 'UPDATE' or TG_OP 'DELETE') and TG_TABLE_NAME = 'Specializes' then
+        if old.eid in (select eid from Instructors) and
+            old.eid not in (select eid from Specializes) then
+            raise exception 'Instructor % must specialise in at least one course area.', old.eid;
+        end if;
+    end if;
+
+    return null;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS at_least_one_specialization on Instructors;
+DROP TRIGGER IF EXISTS at_least_one_specialization on Specializes;
+
+CREATE TRIGGER at_least_one_specialization
+AFTER INSERT ON Instructors
+FOR EACH ROW EXECUTE FUNCTION at_least_one_specialization();
+
+CREATE TRIGGER at_least_one_specialization
+AFTER UPDATE OR DELETE ON Specializes
+FOR EACH ROW EXECUTE FUNCTION at_least_one_specialization();
 
 
 
@@ -55,7 +320,7 @@ BEGIN
     END IF;
 
     RETURN OLD;
-END
+END;
 $$ language plpgsql;
 
 
@@ -98,7 +363,7 @@ BEGIN
     END IF;
 
     RETURN NEW;
-END
+END;
 $$ language plpgsql;
 
 
@@ -107,6 +372,8 @@ DROP TRIGGER IF EXISTS at_most_one_package on Buys;
 CREATE CONSTRAINT TRIGGER at_most_one_package AFTER INSERT OR UPDATE ON Buys
 FOR EACH ROW
 EXECUTE FUNCTION at_most_one_package();
+
+
 
 /*
 Trigger to check for inserting/updating a registration/redemption of session.
@@ -170,7 +437,6 @@ BEGIN
     END IF;
     RETURN new;
 END;
-
 $$ LANGUAGE plpgsql;
 
 
@@ -188,6 +454,8 @@ CREATE CONSTRAINT TRIGGER valid_session
     ON Registers
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();
+
+
 
 -- to ensure that course offerings will have >= 1
 CREATE OR REPLACE FUNCTION after_insert_into_offerings()

@@ -11,7 +11,6 @@ CASCADE;
  * Personnels & Organisation-related Information
  ************************************************/
 
--- TODO: Covering constraint: eid must be in Part time or Full time but not both
 CREATE TABLE Employees
 (
     eid 		int primary key,
@@ -26,7 +25,6 @@ CREATE TABLE Employees
     CONSTRAINT join_before_depart check (join_date <= depart_date)
 );
 
--- TODO: Covering constraint: all part time employee must be part time instructors
 CREATE TABLE Part_time_emp
 (
     eid 		int primary key references Employees on delete cascade,
@@ -35,7 +33,6 @@ CREATE TABLE Part_time_emp
     CONSTRAINT non_negative_hourly_rate check (hourly_rate >= 0)
 );
 
--- TODO: Covering constraint: all full time employee must be either Full_time instructors or administrators or managers
 CREATE TABLE Full_time_emp
 (
     eid 			int primary key references Employees on delete cascade,
@@ -44,7 +41,6 @@ CREATE TABLE Full_time_emp
     CONSTRAINT non_negative_monthly_salary check (monthly_salary >= 0)
 );
 
--- TODO: Covering constraint: all instructors must be either part-time or full-time instructors
 CREATE TABLE Instructors
 (
     eid int primary key references Employees on delete cascade
@@ -112,7 +108,6 @@ CREATE TABLE Course_areas
     eid         int not null references Managers
 );
 
--- TODO: Trigger - to enforce total participation, every Instructors has >= 1 specialisation
 CREATE TABLE Specializes
 (
     eid 		int references Instructors,
