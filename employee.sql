@@ -140,73 +140,75 @@ BEGIN
         _eid := r.eid;
         _name := r.name;
 
-        if _eid in (select eid from Part_time_emp) then
-            _status := 'Part-time';
-            _num_work_days := null;
+        if _eid not in (select eid from Employees where depart_date < make_date(1, _pay_month, _pay_year)) then
+            if _eid in (select eid from Part_time_emp) then
+                _status := 'Part-time';
+                _num_work_days := null;
             
-            -- compute number of hours worked by the part-time instructor
-            -- assume start_time and end_time are in units of hour
-            select coalesce(sum(extract(hour from end_time) - extract(hour from start_time))::int, 0)
-                into _num_work_hours
-            from Sessions
-            where eid = _eid
-            and _pay_month = (extract(month from session_date))::int
-            and _pay_year = (extract(year from session_date))::int;
+                -- compute number of hours worked by the part-time instructor
+                -- assume start_time and end_time are in units of hour
+                select coalesce(sum(extract(hour from end_time) - extract(hour from start_time))::int, 0)
+                    into _num_work_hours
+                from Sessions
+                where eid = _eid
+                and _pay_month = (extract(month from session_date))::int
+                and _pay_year = (extract(year from session_date))::int;
 
-            select hourly_rate into _hourly_rate
-            from Part_time_emp
-            where eid = _eid;
+                select hourly_rate into _hourly_rate
+                from Part_time_emp
+                where eid = _eid;
 
-            _monthly_salary := null;
-            _amount := (_num_work_hours * _hourly_rate)::numeric;
-            _amount := round(_amount, 2);
+                _monthly_salary := null;
+                _amount := (_num_work_hours * _hourly_rate)::numeric;
+                _amount := round(_amount, 2);
 
-            return next;
-        else -- full-time employee
-            _status := 'Full-time';
+                return next;
+            else -- full-time employee
+                _status := 'Full-time';
 
-            -- compute number of days in a month
-            select (extract(days from date_trunc('month', make_date(_pay_year, _pay_month, 1))
-                    + interval '1 month - 1 day'))::int into _num_of_days;
+                -- compute number of days in a month
+                select (extract(days from date_trunc('month', make_date(_pay_year, _pay_month, 1))
+                        + interval '1 month - 1 day'))::int into _num_of_days;
 
-            -- compute number of work days
-            select join_date, depart_date into _join_date, _depart_date
-            from Employees
-            where eid = _eid;
+                -- compute number of work days
+                select join_date, depart_date into _join_date, _depart_date
+                from Employees
+                where eid = _eid;
 
-            if _pay_month = (extract(month from _join_date))::int
-                and _pay_year = (extract(year from _join_date))::int then
-                _first_work_day := (extract(day from _join_date))::int;
-            else
-                _first_work_day := 1;
+                if _pay_month = (extract(month from _join_date))::int
+                    and _pay_year = (extract(year from _join_date))::int then
+                    _first_work_day := (extract(day from _join_date))::int;
+                else
+                    _first_work_day := 1;
+                end if;
+
+                if _pay_month = (extract(month from _depart_date))::int
+                    and _pay_year = (extract(year from _depart_date))::int then
+                    _last_work_day := (extract(day from _depart_date))::int;
+                else
+                    _last_work_day := _num_of_days;
+                end if;
+
+                _num_work_days := _last_work_day - _first_work_day + 1;
+                _num_work_hours := null;
+                _hourly_rate := null;
+
+                select monthly_salary into _monthly_salary
+                from Full_time_emp
+                where eid = _eid;
+
+                _amount := (_num_work_days::numeric / _num_of_days * _monthly_salary)::numeric;
+                _amount := round(_amount, 2);
+            
+                return next;
             end if;
 
-            if _pay_month = (extract(month from _depart_date))::int
-                and _pay_year = (extract(year from _depart_date))::int then
-                _last_work_day := (extract(day from _depart_date))::int;
-            else
-                _last_work_day := _num_of_days;
-            end if;
-
-            _num_work_days := _last_work_day - _first_work_day + 1;
-            _num_work_hours := null;
-            _hourly_rate := null;
-
-            select monthly_salary into _monthly_salary
-            from Full_time_emp
-            where eid = _eid;
-
-            _amount := (_num_work_days::numeric / _num_of_days * _monthly_salary)::numeric;
-            _amount := round(_amount, 2);
-            
-            return next;
+            -- insert salary payment record
+            _pay_date := make_date(_pay_year, _pay_month, _num_of_days);
+            insert into Pay_slips
+            values (_eid, _pay_date, _amount::numeric, _num_work_days, _num_work_hours);
+    
         end if;
-
-        -- insert salary payment record
-        _pay_date := make_date(_pay_year, _pay_month, _num_of_days);
-        insert into Pay_slips
-        values (_eid, _pay_date, _amount::numeric, _num_work_days, _num_work_hours);
-
     end loop;
     close curs;
 END;

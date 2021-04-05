@@ -16,7 +16,7 @@ BEGIN
     -- validate session_start_time and session_end_time
     _session_start_time := _session_start_hour;
     _session_end_time := _session_start_hour + concat(_session_duration, ' hours')::interval;
-    if not (_session_start_time, _session_end_time) overlaps (time '09:00', time '18:00')
+    if (not (_session_start_time, _session_end_time) overlaps (time '09:00', time '18:00'))
         or (_session_start_time, _session_end_time) overlaps (time '12:00', time '14:00') then
         raise exception 'Session start time and/or duration is/are invalid.';
     end if;
