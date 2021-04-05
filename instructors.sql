@@ -49,6 +49,7 @@ BEGIN
             FROM Sessions S 
             WHERE S.eid = in_eid AND 
             (SELECT EXTRACT (MONTH FROM S.session_date)) = (SELECT EXTRACT(MONTH FROM date_current))
+            AND (SELECT EXTRACT (YEAR FROM S.session_date)) = (SELECT EXTRACT(YEAR FROM date_current))
         )), 0) INTO total_hour;
 
     RETURN total_hour;
@@ -87,8 +88,10 @@ BEGIN
     end_hour := in_start_hour + span_interval;
     return query
         with
-            R0 as (SELECT DISTINCT Q0.eid, Q0.name
-                   FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN Employees) AS Q0
+            R0 AS (SELECT DISTINCT Q0.eid, Q0.name
+                   FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1
+                       NATURAL JOIN Specializes
+                       NATURAL JOIN (SELECT * FROM Employees E WHERE NOT is_departed(E.eid)) AS TEMP2) AS Q0
             ),
             R1 AS (SELECT DISTINCT Q1.eid, Q1.name
                    FROM (SELECT * FROM R0 NATURAL JOIN Part_time_instructors) AS Q1
@@ -137,7 +140,9 @@ BEGIN
     return query
     with
         R0 AS (SELECT DISTINCT Q0.eid, Q0.name
-               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 NATURAL JOIN Specializes NATURAL JOIN EMPLOYEES) AS Q0
+               FROM ((SELECT * FROM Courses WHERE Courses.course_id = in_cid) AS TEMP1 
+                   NATURAL JOIN Specializes 
+                   NATURAL JOIN (SELECT * FROM Employees E WHERE NOT is_departed(E.eid)) AS TEMP2) AS Q0
         ),
         R1 AS (SELECT CAST(s_day as date) FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
         R2 AS (SELECT DISTINCT Q2.eid, Q2.name, (SELECT get_hours(Q2.eid, Q2.s_day)), Q2.s_day, (SELECT check_availability(Q2.eid, span, Q2.s_day))
@@ -182,7 +187,7 @@ BEGIN
     IF (current_date > s_date OR (current_date = s_date AND current_time > s_time)) THEN
         RAISE EXCEPTION 'This session has already passed';
     END IF;
-
+    
     UPDATE Sessions
     SET eid = new_eid
     WHERE (sid, launch_date, course_id) = (in_sid, date_of_launch, in_cid) AND 

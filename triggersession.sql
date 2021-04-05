@@ -48,31 +48,6 @@ CREATE TRIGGER session_date_checks
 * BEFORE INSERT OR UPDATE ON SESSIONS
 *****************************************/
 
--- to ensure that part time instructors cannot teach more than 30h in a month
-CREATE OR REPLACE FUNCTION instructors_part_time_duration_checks()
-    RETURNS TRIGGER AS $$
-DECLARE
-    span int;
-BEGIN
-    SELECT duration into span
-    FROM Courses
-    WHERE course_id = NEW.course_id;
-
-    -- VALIDATE PART-TIME INSTRUCTOR
-    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((SELECT get_hours(NEW.eid, NEW.session_date)) + span > 30)) THEN
-        RAISE EXCEPTION 'Part-time instructor % is going to be OVERWORKED if he take this session!', NEW.eid;
-        RETURN NULL;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER instructors_part_time_duration_checks
-    BEFORE INSERT OR UPDATE ON Sessions
-    FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
-
-
-
 CREATE OR REPLACE FUNCTION room_availability_checks()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -124,43 +99,34 @@ CREATE TRIGGER new_session_timing_collision_checks
     FOR EACH ROW EXECUTE FUNCTION new_session_timing_collision_checks();
 
 
-
-/******************************************
- * BEFORE DELETE ON SESSIONS
- *****************************************/
-
--- Trigger - Request must not be performed if there is at least one registration for the session
-CREATE OR REPLACE FUNCTION delete_session_checks()
+CREATE OR REPLACE FUNCTION instructors_specialization_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    date_of_session DATE;
-    time_of_session TIME;
+    area text;
 BEGIN
+    SELECT DISTINCT area_name INTO area
+    FROM Courses
+    WHERE course_id = NEW.course_id;
 
-    -- checks if there is anyone who exist in registers/redeems who sign up for that particular course and that particular session
-    IF (EXISTS (SELECT 1 FROM Registers WHERE sid = OLD.sid AND course_id = OLD.course_id AND launch_date = OLD.launch_date)
-        OR EXISTS (SELECT 1 FROM Redeems WHERE sid = OLD.sid AND course_id = OLD.course_id AND launch_date = OLD.launch_date)) THEN
-        RAISE EXCEPTION 'There is someone who registered for this session already';
+    -- VALIDATE SPECIALIZATION
+    IF (NEW.eid NOT IN (SELECT DISTINCT eid FROM Specializes WHERE area_name = area)) THEN
+        RAISE EXCEPTION 'Instructor is not specializing in this course area';
         RETURN NULL;
     END IF;
 
-    -- checks if the course session have already started
-    SELECT DISTINCT S.session_date, S.start_time into date_of_session, time_of_session 
-    FROM Sessions S 
-    where S.sid = OLD.sid and S.course_id = OLD.course_id and S.launch_date = OLD.launch_date;
-    
-    IF (date_of_session < current_date OR (date_of_session = current_date AND time_of_session < current_time)) THEN
-        RAISE EXCEPTION 'Course session has already started';
-    END IF;
-    
-    RETURN OLD;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER delete_session_checks
-    AFTER DELETE OR UPDATE ON Sessions
-    FOR EACH ROW EXECUTE FUNCTION delete_session_checks();
+DROP TRIGGER IF EXISTS instructors_specialization_checks on Sessions;
 
+CREATE TRIGGER instructors_specialization_checks
+    BEFORE INSERT OR UPDATE ON Sessions
+    FOR EACH ROW EXECUTE FUNCTION instructors_specialization_checks();
+
+/******************************************
+ * BEFORE DELETE OR UPDATE ON SESSIONS
+ *****************************************/
 
 /******************************************
 * AFTER INSERT ON SESSIONS
@@ -251,6 +217,36 @@ CREATE CONSTRAINT TRIGGER instructors_overlap_timing_checks
     FOR EACH ROW EXECUTE FUNCTION instructors_overlap_timing_checks();
 
 
+-- to ensure that part time instructors cannot teach more than 30h in a month
+CREATE OR REPLACE FUNCTION instructors_part_time_duration_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    -- VALIDATE PART-TIME INSTRUCTOR
+    IF (NEW.eid IN (SELECT eid FROM Part_time_instructors) AND ((SELECT get_hours(NEW.eid, NEW.session_date)) > 30)) THEN
+        RAISE EXCEPTION 'Part-time instructor % is going to be OVERWORKED if he take this session!', NEW.eid;
+        RETURN NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER instructors_part_time_duration_checks
+    AFTER INSERT OR UPDATE ON Sessions
+    FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
+
+CREATE OR REPLACE FUNCTION instructor_not_departed_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF (is_departed(NEW.eid)) THEN
+        RAISE EXCEPTION 'This instructor have already departed, he cant teach this course anymore';
+    end if;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER instructor_not_departed_checks
+    AFTER INSERT OR UPDATE ON Sessions
+    FOR EACH ROW EXECUTE FUNCTION instructor_not_departed_checks();
 
 /******************************************
  * AFTER DELETE ON SESSIONS
@@ -272,4 +268,34 @@ CREATE CONSTRAINT TRIGGER after_delete_of_sessions
     AFTER DELETE OR UPDATE ON Sessions
     FOR EACH ROW EXECUTE FUNCTION after_delete_of_sessions();
 
+/******************************************
+ * AFTER DELETE OR UPDATE ON SESSIONS
+ *****************************************/
 
+-- Trigger - Request must not be performed if there is at least one registration for the session
+CREATE OR REPLACE FUNCTION delete_session_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'UPDATE' AND OLD.sid = NEW.sid AND OLD.course_id = new.course_id AND NEW.launch_date = OLD.launch_date) THEN
+        RETURN NEW;
+    END IF;
+    -- checks if there is anyone who exist in registers/redeems who sign up for that particular course and that particular session
+    IF (EXISTS (SELECT 1 FROM Registers WHERE sid = OLD.sid AND course_id = OLD.course_id AND launch_date = OLD.launch_date)
+        OR EXISTS (SELECT 1 FROM Redeems WHERE sid = OLD.sid AND course_id = OLD.course_id AND launch_date = OLD.launch_date)) THEN
+        RAISE EXCEPTION 'There is someone who registered for this session already';
+        RETURN NULL;
+    END IF;
+
+    -- checks if the course session have already started
+
+    IF (OLD.session_date < current_date OR (OLD.session_date = current_date AND OLD.start_time < current_time)) THEN
+        RAISE EXCEPTION 'Course session has already started';
+    END IF;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER delete_session_checks
+    AFTER DELETE OR UPDATE ON Sessions
+    FOR EACH ROW EXECUTE FUNCTION delete_session_checks();
