@@ -123,7 +123,6 @@ DECLARE
     _new_room_capacity int;
     _num_of_redeem int;
     _num_of_register int;
-    _num_of_cancel int;
 BEGIN
     -- check if session exists
     if not exists (
@@ -161,11 +160,7 @@ BEGIN
     from Registers
     where course_id = _cid and launch_date = _launch_date and sid = _session_num;
 
-    select count(cust_id) into _num_of_cancel
-    from Cancels
-    where course_id = _cid and launch_date = _launch_date and sid = _session_num;
-
-    if _new_room_capacity < (_num_of_redeem + _num_of_register - _num_of_cancel) then
+   if _new_room_capacity < (_num_of_redeem + _num_of_register) then
         raise exception 'The number of registrations exceeds the seating capacity of the new room.';
     end if;
 
