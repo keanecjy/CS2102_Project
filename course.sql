@@ -1,11 +1,11 @@
 /*
-add_course:
-add_course_offering:
-get_available_course_offerings:
-get_available_course_sessions:
-update_course_session:
-promote_courses:
-popular_courses:
+add_course
+add_course_offering
+get_available_course_offerings
+get_available_course_sessions
+update_course_session
+promote_courses
+popular_courses
 */
 
 -- Adds a course into the courses table
@@ -42,7 +42,7 @@ DECLARE
 
 BEGIN
     -- 	Checking validity of course offering information
-    IF (ARRAY_LENGTH(sessions_arr, 1) = 0 or l_date < current_date) THEN
+    IF (ARRAY_LENGTH(sessions_arr, 1) = 0 or reg_deadline < current_date) THEN
         RAISE EXCEPTION 'Course offering details are invalid';
     END IF;
 
