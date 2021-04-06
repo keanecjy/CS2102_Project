@@ -86,11 +86,11 @@ BEGIN
     where cust_id = cid and
         (num_remaining_redemptions > 0 or
             exists(select 1
-                from Redeems R natural join Sessions
+                from Redeems R natural join Sessions S
                 where R.cust_id = cid and
                     R.buy_date = B.buy_date and
                     R.package_id = B.package_id and
-                    current_date + 7 <= launch_date));
+                    current_date + 7 <= S.session_date));
 
     if not found then 
         raise info 'No active/partially active course package for customer %', cid;

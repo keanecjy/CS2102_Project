@@ -345,21 +345,17 @@ RETURNS TRIGGER AS $$
 DECLARE
     num_packages int;
 BEGIN
-    WITH Redemption_CTE as (
-        SELECT *
-        FROM Redeems NATURAL JOIN Sessions
-        WHERE cust_id = NEW.cust_id
-    )
+
     SELECT COUNT(*) INTO num_packages
     FROM Buys B
     WHERE cust_id = NEW.cust_id AND
         (num_remaining_redemptions > 0 OR
             EXISTS(SELECT 1
-                FROM Redemption_CTE R
+                FROM Redeems R NATURAL JOIN Sessions S
                 WHERE R.buy_date = B.buy_date AND
                     R.cust_id = B.cust_id AND
                     R.package_id = B.package_id AND
-                    current_date + 7 <= R.session_date));
+                    current_date + 7 <= S.session_date));
 
     IF (num_packages > 1) THEN
         RAISE EXCEPTION 'Customer % can only have at most one active or partially active package', NEW.cust_id;
@@ -372,49 +368,6 @@ $$ language plpgsql;
 CREATE CONSTRAINT TRIGGER at_most_one_package
 AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION at_most_one_package();
-
-
-
-/**
- * - Maintain the redemption count of customer's active/partially active package.
- * - Enforce that each customer can have at most one active or partially active package
- */
--- CREATE OR REPLACE FUNCTION update_redemption_count()
---     RETURNS TRIGGER AS $$
--- DECLARE
--- BEGIN
---     IF TG_OP = 'INSERT' THEN
---         SELECT *
---         FROM Buys B
---         WHERE B.cust_id = NEW.cust_id AND B.num_remaining_redemptions > 0;
---
---         IF NOT FOUND THEN
---             RAISE EXCEPTION 'Customer % does not have an active course package that is available for free redemptions', NEW.cust_id;
---         END IF;
---
---         UPDATE Buys B
---         SET num_remaining_redemptions = num_remaining_redemptions - 1
---         WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
---
---     ELSIF TG_OP = 'UPDATE' THEN
---         IF ((NEW.cust_id, NEW.package_id) <> (OLD.cust_id, OLD.package_id)) THEN
---             RAISE EXCEPTION 'Cannot directly modify package number of customer % redemptions', OLD.cust_id;
---         END IF;
---     ELSE
---         -- DELETE
---         IF (current_date + 7 <= OLD.session_date) THEN
---             UPDATE Buys B
---             SET num_remaining_redemptions = num_remaining_redemptions + 1
---             WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
---         END IF;
---     END IF;
---
--- END;
--- $$ language plpgsql;
---
--- CREATE CONSTRAINT TRIGGER update_redemption_count
--- AFTER INSERT OR UPDATE OR DELETE ON Redeems DEFERRABLE INITIALLY DEFERRED
--- FOR EACH ROW EXECUTE FUNCTION update_redemption_count();
 
 
 
@@ -503,7 +456,7 @@ BEGIN
     IF (NOT EXISTS (SELECT 1 FROM Sessions S WHERE S.launch_date = NEW.launch_date AND S.course_id = NEW.course_id)) THEN
         RAISE EXCEPTION 'There isnt any session in this course offerings: %', NEW.course_id;
     END IF;
-    RETURN NEW;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -512,6 +465,8 @@ AFTER INSERT OR UPDATE ON Offerings DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION after_insert_into_offerings();
 
 
+
+-- Handles refund of registrations if it is eligible for refund
 CREATE OR REPLACE FUNCTION after_delete_of_registers()
     RETURNS TRIGGER AS
 $$
@@ -539,72 +494,69 @@ CREATE TRIGGER after_delete_of_registers
 AFTER DELETE ON Registers
 FOR EACH ROW EXECUTE FUNCTION after_delete_of_registers();
 
-CREATE OR REPLACE FUNCTION after_delete_of_redeems()
-    RETURNS TRIGGER AS
-$$
-DECLARE
-    date_of_session DATE;    
-BEGIN
-    SELECT S.session_date INTO date_of_session
-    FROM Sessions S
-    WHERE S.sid = OLD.sid
-      AND S.course_id = OLD.course_id
-      AND S.launch_date = OLD.launch_date;
 
-    -- update as triggers?
-    IF (current_date + 7 <= date_of_session) THEN
+/**
+ * - Maintain the redemption count of customer's active/partially active package.
+ * - Enforce that each customer can have at most one active or partially active package
+ */
+CREATE OR REPLACE FUNCTION modify_redeem_check()
+    RETURNS TRIGGER AS $$
+DECLARE
+    date_of_session DATE;
+    num_packages int;
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        -- udpate redemption count
         UPDATE Buys B
-        SET num_remaining_redemptions = num_remaining_redemptions + 1
-        WHERE B.buy_date = OLD.buy_date
-          AND B.cust_id = OLD.cust_id
-          AND B.package_id = OLD.package_id;
+        SET num_remaining_redemptions = num_remaining_redemptions - 1
+        WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
+
+    ELSIF TG_OP = 'UPDATE' THEN
+
+        IF ((NEW.buy_date, NEW.cust_id, NEW.package_id) <> (OLD.buy_date, OLD.cust_id, OLD.package_id)) THEN
+            RAISE EXCEPTION 'Cannot directly modify package type for redeems table';
+        END IF;
+
+        -- Enforce that update maintains the at most one active/partially active constraint
+        SELECT COUNT(*) INTO num_packages
+        FROM Buys B
+        WHERE cust_id = NEW.cust_id AND
+            (num_remaining_redemptions > 0 OR
+             EXISTS(SELECT 1
+                    FROM Redeems R NATURAL JOIN Sessions S
+                    WHERE R.buy_date = B.buy_date AND
+                            R.cust_id = B.cust_id AND
+                            R.package_id = B.package_id AND
+                            current_date + 7 <= S.session_date));
+
+        IF (num_packages > 1) THEN
+            RAISE EXCEPTION 'Updating the course session will result in multiple active/partially active package for Customer %', NEW.cust_id
+                USING HINT = 'Use register_session and cancel_session to add and remove redeemed sessions';
+        END IF;
+
+    ELSE
+        -- DELETE
+
+        SELECT session_date into date_of_session
+        FROM Sessions
+        WHERE (sid, course_id, launch_date) = (OLD.sid, OLD.course_id, OLD.launch_date);
+
+        -- handle the cancellation of session
+        IF (current_date + 7 <= date_of_session) THEN
+            UPDATE Buys B
+            SET num_remaining_redemptions = num_remaining_redemptions + 1
+            WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
+
+            INSERT INTO Cancels VALUES (now(), null, 1, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+        ELSE
+            INSERT INTO Cancels VALUES (now(), null, 0, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+        END IF;
+
     END IF;
 
-    INSERT INTO Cancels VALUES (now(), null, 1, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
-    RETURN NULL;
-end;
-$$ LANGUAGE plpgsql;
+END;
+$$ language plpgsql;
 
-CREATE TRIGGER after_delete_of_redeems
-AFTER DELETE ON Redeems
-FOR EACH ROW EXECUTE FUNCTION after_delete_of_redeems(); -- should it be just for each statement
-
-
-CREATE OR REPLACE FUNCTION after_insert_of_redeems()
-    RETURNS TRIGGER AS
-$$
-BEGIN
-    UPDATE Buys B
-    SET num_remaining_redemptions = num_remaining_redemptions - 1
-    WHERE B.cust_id = NEW.cust_id;
-    RETURN NULL;
-end;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER after_insert_of_redeems
-AFTER INSERT ON Redeems
-FOR EACH ROW EXECUTE FUNCTION after_insert_of_redeems();
-
-CREATE OR REPLACE FUNCTION after_update_of_redeems()
-    RETURNS TRIGGER AS
-$$
-BEGIN
-    IF (OLD.cust_id = NEW.cust_id) THEN
-        RETURN NEW;
-    end if;
-
-    UPDATE Buys B
-    SET num_remaining_redemptions = num_remaining_redemptions - 1
-    WHERE B.cust_id = NEW.cust_id;
-
-    UPDATE Buys B
-    SET num_remaining_redemptions = num_remaining_redemptions + 1
-    WHERE B.cust_id = OLD.cust_id;
-    
-    RETURN NULL;
-end;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER after_update_of_redeems
-AFTER UPDATE ON Redeems
-FOR EACH ROW EXECUTE FUNCTION after_update_of_redeems();
+CREATE CONSTRAINT TRIGGER modify_redeem_check
+AFTER INSERT OR UPDATE OR DELETE ON Redeems DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION modify_redeem_check();
