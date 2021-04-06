@@ -27,8 +27,6 @@ BEGIN
     
     insert into Credit_cards 
     values (card_number, CVV, expiry_date, cid, now());
-
-    raise info 'Successfully added customer id %', cid;
 END
 $$ language plpgsql;
 
@@ -62,13 +60,9 @@ BEGIN
             expiry_date = c_expiry, 
             CVV = c_cvv
         where cust_id = cid and card_number = c_number;
-
-        raise info 'Updated old credit card for customer %', cid;
     else 
         insert into Credit_cards
         values (c_number, c_cvv, c_expiry, cid, now());
-
-        raise info 'Added new credit card for customer %', cid;
     end if;
 END
 $$ language plpgsql;

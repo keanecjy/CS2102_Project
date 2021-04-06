@@ -18,8 +18,6 @@ BEGIN
     -- insert into course packages
     insert into course_packages 
     values (pid, name, num_sessions, price, start_date, end_date);
-
-    raise info 'Successfully added course package %', pid;
 END
 $$ language plpgsql;
 
@@ -65,8 +63,6 @@ BEGIN
     -- buying course package
     insert into Buys
     values (current_date, cid, active_card.card_number, pid, n_redemptions);
-    
-    raise info 'Successfully bought course package % for customer %', pid, cid;
 END
 $$ language plpgsql;
 
@@ -77,8 +73,6 @@ $$ language plpgsql;
  * get_my_course_package(): 
  *  - used when a customer requests to view his/her active/partially active course package
  */
-
--- TODO: test with multiple redeemed sessions to check that the redeemed sessions is sorted in ascending order of session date and start hour
 CREATE OR REPLACE FUNCTION get_my_course_package(cid int)
 RETURNS json AS $$
 DECLARE

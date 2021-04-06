@@ -320,7 +320,7 @@ BEGIN
 
     IF (NOT EXISTS(SELECT 1 FROM Credit_cards WHERE cust_id = rec.cust_id)
         AND EXISTS(SELECT 1 FROM Customers WHERE cust_id = rec.cust_id)) THEN
-        RAISE EXCEPTION 'Sorry, customer id % must have at least one credit card', OLD.cust_id;
+        RAISE EXCEPTION 'Sorry, customer id % must have at least one credit card', rec.cust_id;
     END IF;
 
     RETURN rec;
@@ -338,10 +338,8 @@ FOR EACH ROW EXECUTE FUNCTION at_least_one_card();
 
 
 /**
- * Constraint trigger on Buys
- *  -> to enforce that each customer can have at most one active or partially active package
+ * Enforce that each customer can have at most one active or partially active package
  */
-
 CREATE OR REPLACE FUNCTION at_most_one_package()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -361,7 +359,7 @@ BEGIN
                 WHERE R.buy_date = B.buy_date AND
                     R.cust_id = B.cust_id AND
                     R.package_id = B.package_id AND
-                    current_date + 7 <= launch_date));
+                    current_date + 7 <= R.session_date));
 
     IF (num_packages > 1) THEN
         RAISE EXCEPTION 'Customer % can only have at most one active or partially active package', NEW.cust_id;
@@ -372,8 +370,51 @@ END;
 $$ language plpgsql;
 
 CREATE CONSTRAINT TRIGGER at_most_one_package
-AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY IMMEDIATE
+AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION at_most_one_package();
+
+
+
+/**
+ * - Maintain the redemption count of customer's active/partially active package.
+ * - Enforce that each customer can have at most one active or partially active package
+ */
+-- CREATE OR REPLACE FUNCTION update_redemption_count()
+--     RETURNS TRIGGER AS $$
+-- DECLARE
+-- BEGIN
+--     IF TG_OP = 'INSERT' THEN
+--         SELECT *
+--         FROM Buys B
+--         WHERE B.cust_id = NEW.cust_id AND B.num_remaining_redemptions > 0;
+--
+--         IF NOT FOUND THEN
+--             RAISE EXCEPTION 'Customer % does not have an active course package that is available for free redemptions', NEW.cust_id;
+--         END IF;
+--
+--         UPDATE Buys B
+--         SET num_remaining_redemptions = num_remaining_redemptions - 1
+--         WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
+--
+--     ELSIF TG_OP = 'UPDATE' THEN
+--         IF ((NEW.cust_id, NEW.package_id) <> (OLD.cust_id, OLD.package_id)) THEN
+--             RAISE EXCEPTION 'Cannot directly modify package number of customer % redemptions', OLD.cust_id;
+--         END IF;
+--     ELSE
+--         -- DELETE
+--         IF (current_date + 7 <= OLD.session_date) THEN
+--             UPDATE Buys B
+--             SET num_remaining_redemptions = num_remaining_redemptions + 1
+--             WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
+--         END IF;
+--     END IF;
+--
+-- END;
+-- $$ language plpgsql;
+--
+-- CREATE CONSTRAINT TRIGGER update_redemption_count
+-- AFTER INSERT OR UPDATE OR DELETE ON Redeems DEFERRABLE INITIALLY DEFERRED
+-- FOR EACH ROW EXECUTE FUNCTION update_redemption_count();
 
 
 
@@ -383,7 +424,6 @@ Trigger to check for inserting/updating a registration/redemption of session.
 2) Check if current_date have already past the registration_deadline
 3) Check if number of registration + redeems <= seating_capacity
 4) Check if customer register for more than 1 session in this course offering.
-
 */
 CREATE OR REPLACE FUNCTION reg_redeem_check()
     RETURNS trigger AS

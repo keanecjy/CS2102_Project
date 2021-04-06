@@ -15,6 +15,7 @@
  * BEFORE INSERT ON SESSIONS
  *****************************************/
 
+-- Check if added session is a future one and uses a valid sid
 CREATE OR REPLACE FUNCTION session_date_checks()
     RETURNS TRIGGER AS
 $$
@@ -48,57 +49,42 @@ CREATE TRIGGER session_date_checks
 * BEFORE INSERT OR UPDATE ON SESSIONS
 *****************************************/
 
-CREATE OR REPLACE FUNCTION room_availability_checks()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- If there is no change to rid, ignore the room availability check
-    IF (TG_OP = 'UPDATE' AND OLD.rid = NEW.rid) THEN
-        RETURN NEW;
-    END IF;
-
-    -- VALIDATE THE ROOM AVAILABILITY
-    IF (EXISTS (SELECT 1
-                FROM Sessions S
-                WHERE S.session_date = NEW.session_date
-                  AND S.rid = NEW.rid
-                  AND (S.start_time, S.end_time) OVERLAPS (NEW.start_time, NEW.end_time)
-        )
-        ) THEN
-        RAISE EXCEPTION 'Room % is already taken by another session', NEW.rid;
-        RETURN NULL;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER room_availability_checks
-    BEFORE INSERT OR UPDATE ON Sessions
-    FOR EACH ROW EXECUTE FUNCTION room_availability_checks();
-
-
 
 -- Check if session does not collide with lunch hours or exceed working hours
-CREATE OR REPLACE FUNCTION new_session_timing_collision_checks()
+-- Check if session start and end time is equal to course duration
+CREATE OR REPLACE FUNCTION new_session_timing_checks()
     RETURNS TRIGGER AS $$
 DECLARE
     twelve_pm TIME := TIME '12:00';
     two_pm TIME := TIME '14:00';
-    start_time TIME := TIME '09:00';
-    end_time TIME := TIME '18:00';
+    opening_time TIME := TIME '09:00';
+    closing_time TIME := TIME '18:00';
+    span INTERVAL;
 BEGIN
-    IF (NEW.start_time < start_time OR NEW.end_time > end_time OR (NEW.start_time, NEW.end_time) OVERLAPS (twelve_pm, two_pm)) THEN
-        RAISE EXCEPTION 'Invalid start time to end time for this Sessions. If might have overlap with lunch break or cuts into start or end time';
-        RETURN NULL;
+
+    SELECT DISTINCT concat(duration, ' hours')::interval INTO span
+    FROM Courses
+    WHERE course_id = NEW.course_id;
+
+    IF (NEW.start_time + span <> NEW.end_time) THEN
+        RAISE EXCEPTION 'Invalid session hours. The session duration does not match with the specified Course duration';
+    end if;
+
+    IF (NEW.start_time < opening_time OR NEW.end_time > closing_time OR (NEW.start_time, NEW.end_time) OVERLAPS (twelve_pm, two_pm)) THEN
+        RAISE EXCEPTION 'Invalid start time to end time for this Sessions. If might have overlap with lunch break or falls outside the working hours';
     END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER new_session_timing_collision_checks
+CREATE TRIGGER new_session_timing_checks
     BEFORE INSERT OR UPDATE ON Sessions
-    FOR EACH ROW EXECUTE FUNCTION new_session_timing_collision_checks();
+    FOR EACH ROW EXECUTE FUNCTION new_session_timing_checks();
 
 
+
+-- Check if session's course area and instructor's specialisation matches
 CREATE OR REPLACE FUNCTION instructors_specialization_checks()
     RETURNS TRIGGER AS $$
 DECLARE
@@ -117,8 +103,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS instructors_specialization_checks on Sessions;
 
 CREATE TRIGGER instructors_specialization_checks
     BEFORE INSERT OR UPDATE ON Sessions
@@ -141,7 +125,7 @@ DECLARE
 BEGIN
 
     IF (TG_OP in ('INSERT', 'UPDATE')) THEN
-        -- find the maxs and min of the session_date from that particular offering
+        -- find the max and min of the session_date from that particular offering
         SELECT min(session_date), max(session_date) INTO min_date, max_date
         FROM Sessions S
         WHERE S.course_id = NEW.course_id
@@ -163,7 +147,7 @@ BEGIN
 
  
     IF (TG_OP in ('DELETE', 'UPDATE')) THEN
-        -- find the maxs and min of the session_date from that particular offering
+        -- find the max and min of the session_date from that particular offering
         SELECT min(session_date), max(session_date) INTO min_date, max_date
         FROM Sessions S
         WHERE S.course_id = OLD.course_id
@@ -183,7 +167,7 @@ BEGIN
           AND launch_date = OLD.launch_date;
     END IF;   
 
-    RETURN NEW;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -195,18 +179,43 @@ FOR EACH ROW EXECUTE FUNCTION update_offerings_when_session_modified();
 * AFTER INSERT OR UPDATE ON SESSIONS
 *****************************************/
 
+-- Check if rooms of the sessions does not collide
+CREATE OR REPLACE FUNCTION room_availability_checks()
+    RETURNS TRIGGER AS $$
+BEGIN
+    -- VALIDATE THE ROOM AVAILABILITY
+    IF ( 1 < (SELECT count(*)
+              FROM Sessions S
+              WHERE S.session_date = NEW.session_date
+                AND S.rid = NEW.rid
+                AND (S.start_time, S.end_time) OVERLAPS (NEW.start_time, NEW.end_time))
+        ) THEN
+        RAISE EXCEPTION 'Room % is already taken by another session', NEW.rid;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER room_availability_checks
+    AFTER INSERT OR UPDATE ON Sessions
+    FOR EACH ROW EXECUTE FUNCTION room_availability_checks();
+
+
+
+-- Check if instructor is teaching at most one session at any time period
+-- Check that instructor have at least an hour break between sessions.
 CREATE OR REPLACE FUNCTION instructors_overlap_timing_checks()
     RETURNS TRIGGER AS $$
 DECLARE
-    one_hour interval := concat(1, ' hours')::interval;
+    one_hour interval := '1 hours'::interval;
 BEGIN
-    -- VALIDATE AT MOST ONE COURSE SESSION AT ANY HOUR AND NOT TEACH 2 CONSECUTIVE SESSIONS
+    -- VALIDATE INSTRUCTOR TEACH AT MOST ONE COURSE SESSION AT ANY HOUR WITH AT LEAST ONE HOUR BREAK IN BETWEEN SESSIONS
     IF ( 1 < (
         SELECT count(*)
         FROM Sessions S
         WHERE S.session_date = NEW.session_date AND S.eid = NEW.eid AND (NEW.start_time, NEW.end_time) OVERLAPS (S.start_time - one_hour, S.end_time + one_hour))) THEN
 
-        RAISE EXCEPTION 'This instructor is either teaching in this timing or he is having consecutive sessions!';
+        RAISE EXCEPTION 'Instructor % is either teaching in this time slot or he is having consecutive sessions without any break in between!', NEW.eid;
     END IF;
     RETURN NEW;
 END;
@@ -217,7 +226,8 @@ CREATE CONSTRAINT TRIGGER instructors_overlap_timing_checks
     FOR EACH ROW EXECUTE FUNCTION instructors_overlap_timing_checks();
 
 
--- to ensure that part time instructors cannot teach more than 30h in a month
+
+-- Check that part time instructors cannot teach more than 30h in a month
 CREATE OR REPLACE FUNCTION instructors_part_time_duration_checks()
     RETURNS TRIGGER AS $$
 BEGIN
@@ -234,13 +244,20 @@ CREATE CONSTRAINT TRIGGER instructors_part_time_duration_checks
     AFTER INSERT OR UPDATE ON Sessions
     FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
 
+
+
+-- Check that instructor have not left the company
 CREATE OR REPLACE FUNCTION instructor_not_departed_checks()
     RETURNS TRIGGER AS $$
 BEGIN
+    IF (TG_OP = 'UPDATE' and NEW.eid = OLD.eid) THEN
+        RETURN NULL;
+    END IF;
+
     IF (is_departed(NEW.eid)) THEN
         RAISE EXCEPTION 'This instructor have already departed, he cant teach this course anymore';
-    end if;
-    RETURN NEW;
+    END IF;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -252,6 +269,7 @@ CREATE CONSTRAINT TRIGGER instructor_not_departed_checks
  * AFTER DELETE ON SESSIONS
  *****************************************/
 
+-- Check that the course offerings have at least one session.
 CREATE OR REPLACE FUNCTION after_delete_of_sessions()
     RETURNS TRIGGER AS
 $$
