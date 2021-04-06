@@ -441,13 +441,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER valid_session
+CREATE TRIGGER valid_session
     AFTER INSERT OR UPDATE
     ON Redeems
     FOR EACH ROW
 EXECUTE FUNCTION reg_redeem_check();
 
-CREATE CONSTRAINT TRIGGER valid_session
+CREATE TRIGGER valid_session
     AFTER INSERT OR UPDATE
     ON Registers
     FOR EACH ROW
@@ -470,3 +470,101 @@ $$ LANGUAGE plpgsql;
 CREATE CONSTRAINT TRIGGER after_insert_into_offerings
 AFTER INSERT OR UPDATE ON Offerings DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION after_insert_into_offerings();
+
+
+CREATE OR REPLACE FUNCTION after_delete_of_registers()
+    RETURNS TRIGGER AS
+$$
+DECLARE
+    date_of_session DATE;
+    cost float;
+BEGIN
+    SELECT S.session_date INTO date_of_session
+    FROM Sessions S
+    WHERE S.sid = OLD.sid
+      AND S.course_id = OLD.course_id
+      AND S.launch_date = OLD.launch_date;
+
+    IF (current_date + 7 <= date_of_session) THEN
+        select fees into cost FROM Offerings WHERE course_id = OLD.course_id AND launch_date = OLD.launch_date;
+        INSERT INTO Cancels VALUES (now(), 0.9 * cost, null, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+    ELSE
+        INSERT INTO Cancels VALUES (now(), 0, null, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+    end if;
+    RETURN NULL;
+END;    
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER after_delete_of_registers
+AFTER DELETE ON Registers
+FOR EACH ROW EXECUTE FUNCTION after_delete_of_registers();
+
+CREATE OR REPLACE FUNCTION after_delete_of_redeems()
+    RETURNS TRIGGER AS
+$$
+DECLARE
+    date_of_session DATE;    
+BEGIN
+    SELECT S.session_date INTO date_of_session
+    FROM Sessions S
+    WHERE S.sid = OLD.sid
+      AND S.course_id = OLD.course_id
+      AND S.launch_date = OLD.launch_date;
+
+    -- update as triggers?
+    IF (current_date + 7 <= date_of_session) THEN
+        UPDATE Buys B
+        SET num_remaining_redemptions = num_remaining_redemptions + 1
+        WHERE B.buy_date = OLD.buy_date
+          AND B.cust_id = OLD.cust_id
+          AND B.package_id = OLD.package_id;
+    END IF;
+
+    INSERT INTO Cancels VALUES (now(), null, 1, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+    RETURN NULL;
+end;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER after_delete_of_redeems
+AFTER DELETE ON Redeems
+FOR EACH ROW EXECUTE FUNCTION after_delete_of_redeems(); -- should it be just for each statement
+
+
+CREATE OR REPLACE FUNCTION after_insert_of_redeems()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    UPDATE Buys B
+    SET num_remaining_redemptions = num_remaining_redemptions - 1
+    WHERE B.cust_id = NEW.cust_id;
+    RETURN NULL;
+end;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER after_insert_of_redeems
+AFTER INSERT ON Redeems
+FOR EACH ROW EXECUTE FUNCTION after_insert_of_redeems();
+
+CREATE OR REPLACE FUNCTION after_update_of_redeems()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF (OLD.cust_id = NEW.cust_id) THEN
+        RETURN NEW;
+    end if;
+
+    UPDATE Buys B
+    SET num_remaining_redemptions = num_remaining_redemptions - 1
+    WHERE B.cust_id = NEW.cust_id;
+
+    UPDATE Buys B
+    SET num_remaining_redemptions = num_remaining_redemptions + 1
+    WHERE B.cust_id = OLD.cust_id;
+    
+    RETURN NULL;
+end;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER after_update_of_redeems
+AFTER UPDATE ON Redeems
+FOR EACH ROW EXECUTE FUNCTION after_update_of_redeems();
