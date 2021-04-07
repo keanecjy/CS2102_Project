@@ -28,60 +28,137 @@ CREATE OR REPLACE PROCEDURE add_course_offering(cid int, l_date date, fees float
 $$
 
 DECLARE
+    assigned_count      int;
     temp                text[];
+    eid_rec             record;
+    chosen_session      record;
+    one_hour            interval;
+
     course_area         text;
     course_duration     int;
+    earliest_start_date date;
+    latest_end_date     date;
+    seat_capacity       int;
+
+    next_sid            int;
     s_date              date;
     s_time              time;
     s_rid               int;
-    seat_capacity       int;
-    inst_eid            int;
-    next_sid            int;
-    earliest_start_date date;
-    latest_end_date     date;
-
 BEGIN
+    one_hour = '1 hour'::interval;
+    assigned_count := ARRAY_LENGTH(sessions_arr, 1);
+
     -- 	Checking validity of course offering information
-    IF (ARRAY_LENGTH(sessions_arr, 1) = 0 or reg_deadline < current_date) THEN
+    IF (assigned_count = 0 or reg_deadline < current_date) THEN
         RAISE EXCEPTION 'Course offering details are invalid';
     END IF;
 
-    SELECT area_name, duration INTO course_area, course_duration FROM Courses WHERE course_id = cid;
-    next_sid := 1;
-    seat_capacity := 0;
+    SELECT area_name, duration INTO course_area, course_duration
+    FROM Courses
+    WHERE course_id = cid;
 
     -- Temp insertion to allow adding of Sessions
     INSERT INTO Offerings VALUES (l_date, cid, reg_deadline, NULL, NULL, admin_id, 0, 0, fees);
 
-    -- Adding each session in
+    seat_capacity := 0;
+
+    CREATE TEMPORARY TABLE IF NOT EXISTS assignment_table (
+        session_date date,
+        start_time time,
+        end_time time,
+        rid int,
+        eid int,
+
+        primary key (session_date, start_time, rid, eid)
+    ) ON COMMIT DROP;
+
+    ASSERT (select count(*) from assignment_table) = 0;
+
     FOREACH temp SLICE 1 IN ARRAY sessions_arr
-        LOOP
-            s_date := temp[1]::date;
-            s_time := temp[2]::time;
-            s_rid := temp[3];
+    LOOP
+        s_date := temp[1]::date;
+        s_time := temp[2]::time;
+        s_rid := temp[3]::int;
 
-            IF (earliest_start_date IS NULL OR earliest_start_date > s_date)
-            THEN
-                earliest_start_date := s_date;
-            END IF;
+        IF (ARRAY_LENGTH(temp, 1) <> 3) THEN
+            RAISE EXCEPTION 'Please provide the session date, start time and room identifier for each session';
+        END IF;
 
-            IF (latest_end_date IS NULL OR latest_end_date < s_date)
-            THEN
-                latest_end_date := s_date;
-            END IF;
+        -- Add all possible session assignments into assignment table
+        FOR eid_rec IN (SELECT * FROM find_instructors(cid, s_date, s_time)) LOOP
+            INSERT INTO assignment_table
+            VALUES (s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid, eid_rec.eid);
 
-            -- Find an eid from the list of available instructors (do we need to find the most optimal?)
-            SELECT eid INTO inst_eid FROM find_instructors(cid, s_date, s_time) LIMIT 1;
+            RAISE INFO 'Instructor % for course %, session % %', eid_rec.eid, cid, s_date, s_time;
+        END LOOP;
+    END LOOP;
 
-            INSERT INTO Sessions
-            VALUES (next_sid, l_date, cid, s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid,
-                    inst_eid);
+    next_sid := 1;
 
-            seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
-            inst_eid := NULL;
-            next_sid := next_sid + 1;
+    -- Assign instructors and add sessions into sessions table
+    WHILE EXISTS (SELECT 1 FROM assignment_table) LOOP
+
+        -- Greedily select an assignment by choosing least choice_count followed by desire_count
+        -- Choice_count refers to number of possible instructor assignments for a given session
+        -- Desire count refers to the number of clashes with other assignments
+        WITH weighted_choice AS (
+            -- number of instructor choices for a session
+            SELECT session_date, start_time, rid, count(*) as choice_count
+            FROM assignment_table
+            GROUP BY (session_date, start_time, rid)
+        ), weighted_desire AS (
+            SELECT DISTINCT
+                session_date,
+                start_time,
+                eid,
+                (SELECT count(*)
+                 FROM assignment_table B
+                 WHERE (A.session_date, A.eid) = (B.session_date, B.eid) AND
+                        (A.start_time - one_hour, A.end_time + one_hour) OVERLAPS (B.start_time, B.end_time)
+                ) as desire_count
+            FROM assignment_table A
+        )
+        SELECT * INTO chosen_session
+        FROM assignment_table NATURAL JOIN weighted_choice NATURAL JOIN weighted_desire
+        ORDER BY choice_count asc, desire_count asc
+        LIMIT 1;
+
+        -- Add chosen assignment to session
+        INSERT INTO Sessions
+        VALUES (next_sid, l_date, cid,
+                chosen_session.session_date, chosen_session.start_time, chosen_session.end_time,
+                chosen_session.rid, chosen_session.eid);
+
+        -- Update information for next iteration
+        next_sid := next_sid + 1;
+        assigned_count := assigned_count - 1;
+
+        -- Update assignment table remove clashing slots if
+        -- 1. Remove all assignments that assigns to the chosen session
+        -- 2. Remove all assignments that clashes with the chosen session (same room, eid and clashing time w breaks)
+        DELETE FROM assignment_table
+        WHERE (chosen_session.session_date, chosen_session.start_time, chosen_session.rid) = (session_date, start_time, rid) OR
+              (chosen_session.session_date, chosen_session.eid) = (session_date, eid) AND
+              (chosen_session.start_time - one_hour, chosen_session.end_time + one_hour) OVERLAPS (start_time, end_time);
+
+
+        -- Update course offering-related data (start_date, end_date and seat_capacity)
+        IF (earliest_start_date IS NULL OR earliest_start_date > s_date) THEN
+            earliest_start_date := s_date;
+        END IF;
+
+        IF (latest_end_date IS NULL OR latest_end_date < s_date) THEN
+            latest_end_date := s_date;
+        END IF;
+
+        seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
+
 
         END LOOP;
+
+    IF (assigned_count <> 0) THEN
+        RAISE EXCEPTION 'No valid instructor assignment found';
+    END IF;
 
     -- Update the course offerings record after all sessions are inserted
     UPDATE Offerings
@@ -93,7 +170,6 @@ BEGIN
       AND launch_date = l_date;
 
 END;
-
 $$ LANGUAGE plpgsql;
 
 

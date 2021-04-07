@@ -68,6 +68,10 @@ DECLARE
     one_hour interval := concat(1, ' hours')::interval;
     span_interval interval;
 BEGIN
+    IF (in_cid not in (select course_id from Courses)) THEN
+        RAISE EXCEPTION 'Course % does not exist', in_cid;
+    END IF;
+
     -- validate session_date
     IF (SELECT EXTRACT(isodow FROM in_session_date) in (6, 7)) THEN
         RAISE EXCEPTION 'Session_date must be a weekday';
@@ -75,7 +79,7 @@ BEGIN
 
     -- validate start_hour
     IF (in_start_hour < TIME '09:00') THEN
-        RAISE EXCEPTION 'Cant a session before 9am';
+        RAISE EXCEPTION 'Cannot have a session before 9am';
     END IF;
 
     SELECT duration INTO span FROM Courses WHERE Courses.course_id = in_cid;
