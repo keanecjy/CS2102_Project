@@ -94,15 +94,15 @@ BEGIN
         if old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Administrator % still exists in referenced tables.', old.eid;
-        end if; 
-        
+        end if;
+
         return null;
     elsif TG_TABLE_NAME = 'managers' then
         if old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Manager % still exists in referenced tables.', old.eid;
         end if;
-        
+
         return null;
     else
         raise exception 'Internal error in update_or_delete_employee_cat_check';
@@ -420,7 +420,7 @@ BEGIN
     IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
         RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
-    
+
     -- Check if there is enough slots in the session
     IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) > seat_cap) THEN
         RAISE EXCEPTION 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
@@ -487,7 +487,7 @@ BEGIN
         INSERT INTO Cancels VALUES (now(), 0, null, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
     end if;
     RETURN NULL;
-END;    
+END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER after_delete_of_registers
@@ -560,3 +560,26 @@ $$ language plpgsql;
 CREATE CONSTRAINT TRIGGER modify_redeem_check
 AFTER INSERT OR UPDATE OR DELETE ON Redeems DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION modify_redeem_check();
+
+CREATE OR REPLACE FUNCTION check_valid_package()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+
+    IF (NOT EXISTS(
+        select 1
+        from Course_packages
+        where NEW.buy_date between sale_start_date and sale_end_date AND
+              NEW.package_id = package_id)
+        ) THEN
+
+        raise exception 'Course package % is not available', NEW.package_id
+            using hint = 'Check for available courses using get_available_course_packages()';
+    END IF;
+    RETURN NULL;
+END;
+$$ language plpgsql;
+
+CREATE CONSTRAINT TRIGGER check_valid_package
+AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION check_valid_package();
