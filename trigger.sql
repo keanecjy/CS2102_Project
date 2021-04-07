@@ -94,15 +94,15 @@ BEGIN
         if old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Administrator % still exists in referenced tables.', old.eid;
-        end if; 
-        
+        end if;
+
         return null;
     elsif TG_TABLE_NAME = 'managers' then
         if old.eid in (select eid from Full_time_emp) or
             old.eid in (select eid from Employees) then
             raise exception 'Manager % still exists in referenced tables.', old.eid;
         end if;
-        
+
         return null;
     else
         raise exception 'Internal error in update_or_delete_employee_cat_check';
@@ -384,7 +384,6 @@ $$
 DECLARE
     deadline       date;
     s_date         date;
-    s_time         time;
     seat_cap       int;
     num_registered int;
 
@@ -396,8 +395,8 @@ BEGIN
     WHERE launch_date = new.launch_date
       AND course_id = new.course_id;
 
-    SELECT seating_capacity, session_date, start_time
-    INTO seat_cap, s_date, s_time
+    SELECT seating_capacity, session_date
+    INTO seat_cap, s_date
     FROM Sessions
              NATURAL JOIN Rooms
     WHERE new.sid = sid
@@ -416,12 +415,12 @@ BEGIN
                                         WHERE new.launch_date = launch_date
                                           AND new.course_id = course_id
                                           AND new.cust_id = cust_id);
-
+ 
     -- Check if current_date have already past the session_date or registration deadline
-    IF (CURRENT_DATE > s_date OR (CURRENT_DATE = s_date AND CURRENT_TIME > s_time) OR CURRENT_DATE > deadline) THEN
+    IF (NEW.register_date > deadline) THEN
         RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
-    
+
     -- Check if there is enough slots in the session
     IF (get_num_registration_for_session(new.sid, new.launch_date, new.course_id) > seat_cap) THEN
         RAISE EXCEPTION 'Session % with Course id: % and launch date: % is already full', new.sid, new.course_id, new.launch_date;
@@ -488,7 +487,7 @@ BEGIN
         INSERT INTO Cancels VALUES (now(), 0, null, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
     end if;
     RETURN NULL;
-END;    
+END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER after_delete_of_registers
@@ -561,3 +560,42 @@ $$ language plpgsql;
 CREATE CONSTRAINT TRIGGER modify_redeem_check
 AFTER INSERT OR UPDATE OR DELETE ON Redeems DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION modify_redeem_check();
+
+CREATE OR REPLACE FUNCTION check_valid_package()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+
+    IF (NOT EXISTS(
+        select 1
+        from Course_packages
+        where NEW.buy_date between sale_start_date and sale_end_date AND
+              NEW.package_id = package_id)
+        ) THEN
+
+        raise exception 'Course package % is not available', NEW.package_id
+            using hint = 'Check for available courses using get_available_course_packages()';
+    END IF;
+    RETURN NULL;
+END;
+$$ language plpgsql;
+
+CREATE CONSTRAINT TRIGGER check_valid_package
+AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION check_valid_package();
+
+
+CREATE OR REPLACE FUNCTION cancel_timing_checks()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF (NEW.cancel_date > now()) THEN
+        RAISE EXCEPTION 'You cant add a Cancel information into the future';
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER cancel_timing_checks
+AFTER INSERT OR UPDATE ON Cancels
+FOR EACH ROW EXECUTE FUNCTION cancel_timing_checks();

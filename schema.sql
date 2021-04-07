@@ -271,7 +271,8 @@ CREATE TABLE Redeems
     foreign key (buy_date, cust_id, package_id) references Buys,
     foreign key (sid, launch_date, course_id) references Sessions,
 
-    CONSTRAINT purchase_package_before_redeem check (buy_date <= redeem_date)
+    CONSTRAINT purchase_package_before_redeem check (buy_date <= redeem_date),
+    CONSTRAINT redeem_after_launch check (launch_date <= redeem_date)
 );
 
 -- NOTE: card_number not part of pri key
@@ -290,7 +291,8 @@ CREATE TABLE Registers
     unique (cust_id, course_id, launch_date),
     primary key (register_date, cust_id, sid, launch_date, course_id),
     foreign key (cust_id, card_number) references Credit_cards (cust_id, card_number),
-    foreign key (sid, launch_date, course_id) references Sessions
+    foreign key (sid, launch_date, course_id) references Sessions,
+    CONSTRAINT register_after_launch check (launch_date <= register_date)
 );
 
 CREATE TABLE Cancels
@@ -310,5 +312,6 @@ CREATE TABLE Cancels
     CONSTRAINT refund_package_or_money check (
         (refund_amt is not null and package_credit is null) or
         (refund_amt is null and package_credit is not null)
-    )
+    ),
+    CONSTRAINT cancel_after_launch check (launch_date <= cancel_date)
 );

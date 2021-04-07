@@ -47,12 +47,6 @@ DECLARE
     active_card Credit_cards;
     n_redemptions int;
 BEGIN
-    
-    if (pid not in (select id from get_available_course_packages())) then
-        raise exception 'Course package % is not available', pid
-            using hint = 'Check for available courses using get_available_course_packages()';
-    end if;
-
     -- get required details
     select * into active_card from get_active_card(cid);
     
@@ -143,6 +137,10 @@ RETURNS TABLE (
     number_sold bigint
 ) AS $$
 DECLARE
+    curs refcursor;
+    r record;
+    prev_sold int;
+
     current_year double precision;
 BEGIN
 
@@ -154,26 +152,33 @@ BEGIN
     select date_part into current_year
     from date_part('year', current_date);
 
-    return query 
-        with num_sales as (
-            select P.package_id, coalesce(count(buy_date), 0) as number_sold
-            from Course_packages P natural left join Buys B
-            where date_part('year', sale_start_date) = current_year
-            group by P.package_id
-        ), top_N_sale_count as (
-            select distinct S.number_sold
-            from num_sales S
-            order by number_sold desc
-            limit N
-        )
-        select 
-            P.package_id, 
-            P.num_free_registrations as num_free_sessions, 
-            P.price, 
-            P.sale_start_date as start_date, 
-            P.sale_end_date as end_date, 
-            T.number_sold
-        from Course_packages P natural join num_sales S natural join top_N_sale_count T
-        order by number_sold desc, price desc;
+    create temp table if not exists temp as
+        select P.*, coalesce(count(buy_date), 0) as number_sold
+        from Course_packages P natural left join Buys B
+        where date_part('year', sale_start_date) = current_year
+        group by P.package_id;
+
+    open curs for (
+        select * from temp
+        order by number_sold desc, price desc
+    );
+
+    while n >= 0 loop
+        fetch curs into r;
+        exit when not found;
+
+        exit when n = 0 and r.number_sold <> prev_sold;
+
+        package_id := r.package_id;
+        num_free_sessions := r.num_free_registrations;
+        price := r.price;
+        start_date := r.sale_start_date;
+        end_date := r.sale_end_date;
+        number_sold := r.number_sold;
+
+        prev_sold := number_sold;
+
+        return next;
+    end loop;
 END
 $$ language plpgsql;
