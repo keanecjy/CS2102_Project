@@ -118,7 +118,7 @@ $$ LANGUAGE plpgsql;
 
 -- Number of work hours for a part-time instructor is computed based on the number of hours
 -- the part-time instructor taught at all sessions for that particular month and year.
-CREATE OR REPLACE FUNCTION pay_salary()
+CREATE OR REPLACE FUNCTION pay_salary(my_date date)
 RETURNS TABLE(_eid int, _name text, _status text, _num_work_days int, _num_work_hours int,
     _hourly_rate float, _monthly_salary float, _amount numeric) AS $$
 DECLARE
@@ -133,8 +133,8 @@ DECLARE
     _last_work_day int;
     _pay_date date;
 BEGIN
-    _pay_month := extract(month from current_date)::int;
-    _pay_year := extract(year from current_date)::int;
+    _pay_month := extract(month from my_date)::int;
+    _pay_year := extract(year from my_date)::int;
 
     open curs;
     loop
@@ -166,7 +166,6 @@ BEGIN
                 _amount := (_num_work_hours * _hourly_rate)::numeric;
                 _amount := round(_amount, 2);
 
-                return next;
             else -- full-time employee
                 _status := 'Full-time';
 
@@ -203,14 +202,18 @@ BEGIN
 
                 _amount := (_num_work_days::numeric / _num_of_days * _monthly_salary)::numeric;
                 _amount := round(_amount, 2);
-            
-                return next;
+
             end if;
 
-            -- insert salary payment record
-            _pay_date := make_date(_pay_year, _pay_month, _num_of_days);
-            insert into Pay_slips
-            values (_eid, _pay_date, _amount::numeric, _num_work_days, _num_work_hours);
+            -- add to output & table if
+            if (_amount <> 0) then
+                return next;
+                _pay_date := make_date(_pay_year, _pay_month, _num_of_days);
+
+                -- insert salary payment record
+                insert into Pay_slips
+                values (_eid, _pay_date, _amount::numeric, _num_work_days, _num_work_hours);
+            end if;
     
         end if;
     end loop;

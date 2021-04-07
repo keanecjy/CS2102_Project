@@ -1,4 +1,4 @@
-BEGIN;
+BEGIN TRANSACTION;
 
 SET CONSTRAINTS ALL DEFERRED;
 
@@ -6,53 +6,53 @@ SET CONSTRAINTS ALL DEFERRED;
  * Personnels & Organisation-related
  *********************************************/
 
-INSERT INTO Employees (eid, name, phone, email, address, join_date) VALUES 
-(1, 'Nye Vidgen', '83011564', 'nvidgen0@fastcompany.com', '1 Transport Way', '10/25/2020'),
-(2, 'Kacy Faltskog', '89716842', 'kfaltskog1@jiathis.com', '5 Kennedy Hill', '10/25/2020'),
-(3, 'Moira Dawbery', '94248921', 'mdawbery2@usda.gov', '136 Artisan Court', '5/8/2020'),
-(4, 'Sharl Kinghorn', '99037408', 'skinghorn3@wisc.edu', '5 Surrey Lane', '5/23/2020'),
-(5, 'Kalle Kusick', '64118900', 'kkusick4@phoca.cz', '2334 Veith Center', '12/27/2020'),
-(6, 'Dasya Dunton', '95548942', 'ddunton5@engadget.com', '768 Quincy Avenue', '7/13/2020'),
-(7, 'Ranique Luetkemeyers', '87298275', 'rluetkemeyers6@mapy.cz', '5 Pawling Crossing', '10/27/2020'),
-(8, 'Leonhard Groundwater', '99051668', 'lgroundwater7@theguardian.com', '5863 Schiller Street', '9/2/2020'),
-(9, 'Brandie Ziemens', '91643842', 'bziemens8@merriam-webster.com', '03 Kennedy Trail', '9/26/2020'),
-(10, 'Andre Inchcomb', '95993026', 'ainchcomb9@webnode.com', '2 Lakewood Road', '12/8/2020'),
-(11, 'Gipsy Chivrall', '98816199', 'gchivralla@icq.com', '63121 Fulton Alley', '3/22/2021'),
-(12, 'Archie Brunskill', '89790645', 'abrunskillb@elegantthemes.com', '9163 Maryland Street', '9/22/2020'),
-(13, 'Justino Teliga', '63433137', 'jteligac@oaic.gov.au', '4 Boyd Trail', '7/9/2020'),
-(14, 'Caralie Ewbanks', '92983007', 'cewbanksd@over-blog.com', '98111 Morrow Point', '1/21/2021'),
-(15, 'Brose Scollard', '82476370', 'bscollarde@archive.org', '29008 Dwight Court', '9/13/2020'),
-(16, 'Faunie Goacher', '93562662', 'fgoacherf@mozilla.com', '42 Nobel Court', '12/9/2020'),
-(17, 'Pamella MacAskie', '86706014', 'pmacaskieg@tripod.com', '6 Merrick Road', '6/17/2020'),
-(18, 'Caspar Singyard', '93343021', 'csingyardh@kickstarter.com', '4936 Judy Street', '7/15/2020'),
-(19, 'Zelig Scorer', '99231978', 'zscoreri@cmu.edu', '8656 Stone Corner Trail', '1/1/2021'),
-(20, 'Lotta Terne', '99553768', 'lternej@columbia.edu', '00 Shasta Trail', '1/1/2021'),
-(21, 'Kelbee Ludwell', '65008733', 'kludwellk@macromedia.com', '90 Graedel Lane', '1/27/2021'),
-(22, 'Tripp Eskriet', '88445592', 'teskrietl@narod.ru', '93 Packers Plaza', '11/19/2020'),
-(23, 'Shea Kob', '94325785', 'skobm@domainmarket.com', '4115 Esch Crossing', '10/7/2020'),
-(24, 'Ann Dodswell', '90191129', 'adodswelln@t-online.de', '82061 Miller Point', '8/9/2020'),
-(25, 'Raymond Lepope', '60144261', 'rlepopeo@ucla.edu', '2 Main Plaza', '9/4/2020'),
-(26, 'Hertha Lobley', '60795459', 'hlobleyp@bloglines.com', '6997 Ridgeway Court', '2/27/2021'),
-(27, 'Johnna Wyss', '82608424', 'jwyssq@altervista.org', '8889 Surrey Pass', '8/25/2020'),
-(28, 'Dane Weber', '65967734', 'dweberr@moonfruit.com', '1 Holmberg Crossing', '2/24/2021'),
-(29, 'Debi D''Ambrosio', '95556948', 'ddambrosios@woothemes.com', '65773 Stephen Place', '12/20/2020'),
-(30, 'Carmelia Dregan', '94333915', 'cdregant@cnet.com', '7021 Arrowood Hill', '10/17/2020'),
-(31, 'Lev Giannazzo', '97588714', 'lgiannazzou@slideshare.net', '66 Bashford Road', '5/13/2020'),
-(32, 'Russ Tummons', '90527781', 'rtummonsv@usatoday.com', '956 American Ash Alley', '1/31/2021'),
-(33, 'Rosemary Blagden', '98353734', 'rblagdenw@t.co', '531 Westport Avenue', '11/19/2020'),
-(34, 'Eve Swansbury', '96703118', 'eswansburyx@bbc.co.uk', '40 Armistice Plaza', '3/4/2021'),
-(35, 'Jerald Logan', '66658405', 'jlogany@google.it', '2 Everett Lane', '6/8/2020'),
-(36, 'Frederick Lewty', '66955229', 'flewtyz@163.com', '983 Upham Street', '7/12/2020'),
-(37, 'Jae Gippes', '94666112', 'jgippes10@skyrock.com', '760 Northport Alley', '9/27/2020'),
-(38, 'Darwin Pillifant', '86795443', 'dpillifant11@issuu.com', '57 Anderson Hill', '6/10/2020'),
-(39, 'Hi Christensen', '98789416', 'hchristensen12@rakuten.co.jp', '24474 Dapin Court', '9/30/2020'),
-(40, 'Cordelie Laugheran', '90505833', 'claugheran13@dedecms.com', '473 Carey Alley', '9/20/2020'),
-(41, 'mr part-time', '99991111', 'pt@nus.edu.sg', 'sad tree', '9/20/2020'),
-(42, 'manager4pt', '12312312', 'man@nus.edu.sg', 'sad tree2', '8/20/2020'),
-(43, 'admin4pt', '12341234', 'adminpt@nus.edu.sg', 'sad tree3', '7/20/2020'),
-(44, 'mr part-time free', '44443333', '44443333@nus.edu.sg', 'sad tree4', '10/20/2020'),
-(45, 'mr full-time free', '54443333', '54443333@nus.edu.sg', 'sad tree5', '10/20/2020'),
-(46, 'useless guy', '54443334', '54443334@nus.edu.sg', 'sad tree6', '10/20/2020');
+INSERT INTO Employees (eid, name, phone, email, address, join_date, depart_date) VALUES
+(1, 'Nye Vidgen', '83011564', 'nvidgen0@fastcompany.com', '1 Transport Way', '10/25/2020', null),
+(2, 'Kacy Faltskog', '89716842', 'kfaltskog1@jiathis.com', '5 Kennedy Hill', '10/25/2020', null),
+(3, 'Moira Dawbery', '94248921', 'mdawbery2@usda.gov', '136 Artisan Court', '5/8/2020', null),
+(4, 'Sharl Kinghorn', '99037408', 'skinghorn3@wisc.edu', '5 Surrey Lane', '5/23/2020', null),
+(5, 'Kalle Kusick', '64118900', 'kkusick4@phoca.cz', '2334 Veith Center', '12/27/2020', null),
+(6, 'Dasya Dunton', '95548942', 'ddunton5@engadget.com', '768 Quincy Avenue', '7/13/2020', null),
+(7, 'Ranique Luetkemeyers', '87298275', 'rluetkemeyers6@mapy.cz', '5 Pawling Crossing', '10/27/2020', null),
+(8, 'Leonhard Groundwater', '99051668', 'lgroundwater7@theguardian.com', '5863 Schiller Street', '9/2/2020', null),
+(9, 'Brandie Ziemens', '91643842', 'bziemens8@merriam-webster.com', '03 Kennedy Trail', '9/26/2020', null),
+(10, 'Andre Inchcomb', '95993026', 'ainchcomb9@webnode.com', '2 Lakewood Road', '12/8/2020', null),
+(11, 'Gipsy Chivrall', '98816199', 'gchivralla@icq.com', '63121 Fulton Alley', '3/22/2021', null),
+(12, 'Archie Brunskill', '89790645', 'abrunskillb@elegantthemes.com', '9163 Maryland Street', '9/22/2020', null),
+(13, 'Justino Teliga', '63433137', 'jteligac@oaic.gov.au', '4 Boyd Trail', '7/9/2020', null),
+(14, 'Caralie Ewbanks', '92983007', 'cewbanksd@over-blog.com', '98111 Morrow Point', '1/21/2021', '3/10/2021'),
+(15, 'Brose Scollard', '82476370', 'bscollarde@archive.org', '29008 Dwight Court', '9/13/2020', null),
+(16, 'Faunie Goacher', '93562662', 'fgoacherf@mozilla.com', '42 Nobel Court', '12/9/2020', null),
+(17, 'Pamella MacAskie', '86706014', 'pmacaskieg@tripod.com', '6 Merrick Road', '6/17/2020', null),
+(18, 'Caspar Singyard', '93343021', 'csingyardh@kickstarter.com', '4936 Judy Street', '7/15/2020', null),
+(19, 'Zelig Scorer', '99231978', 'zscoreri@cmu.edu', '8656 Stone Corner Trail', '1/1/2021', null),
+(20, 'Lotta Terne', '99553768', 'lternej@columbia.edu', '00 Shasta Trail', '1/1/2021', null),
+(21, 'Kelbee Ludwell', '65008733', 'kludwellk@macromedia.com', '90 Graedel Lane', '1/27/2021', null),
+(22, 'Tripp Eskriet', '88445592', 'teskrietl@narod.ru', '93 Packers Plaza', '11/19/2020', null),
+(23, 'Shea Kob', '94325785', 'skobm@domainmarket.com', '4115 Esch Crossing', '10/7/2020', null),
+(24, 'Ann Dodswell', '90191129', 'adodswelln@t-online.de', '82061 Miller Point', '8/9/2020', null),
+(25, 'Raymond Lepope', '60144261', 'rlepopeo@ucla.edu', '2 Main Plaza', '9/4/2020', null),
+(26, 'Hertha Lobley', '60795459', 'hlobleyp@bloglines.com', '6997 Ridgeway Court', '2/27/2021', null),
+(27, 'Johnna Wyss', '82608424', 'jwyssq@altervista.org', '8889 Surrey Pass', '8/25/2020', null),
+(28, 'Dane Weber', '65967734', 'dweberr@moonfruit.com', '1 Holmberg Crossing', '2/24/2021', null),
+(29, 'Debi D''Ambrosio', '95556948', 'ddambrosios@woothemes.com', '65773 Stephen Place', '12/20/2020', null),
+(30, 'Carmelia Dregan', '94333915', 'cdregant@cnet.com', '7021 Arrowood Hill', '10/17/2020', null),
+(31, 'Lev Giannazzo', '97588714', 'lgiannazzou@slideshare.net', '66 Bashford Road', '5/13/2020', null),
+(32, 'Russ Tummons', '90527781', 'rtummonsv@usatoday.com', '956 American Ash Alley', '1/31/2021', null),
+(33, 'Rosemary Blagden', '98353734', 'rblagdenw@t.co', '531 Westport Avenue', '11/19/2020', null),
+(34, 'Eve Swansbury', '96703118', 'eswansburyx@bbc.co.uk', '40 Armistice Plaza', '3/4/2021', null),
+(35, 'Jerald Logan', '66658405', 'jlogany@google.it', '2 Everett Lane', '6/8/2020', null),
+(36, 'Frederick Lewty', '66955229', 'flewtyz@163.com', '983 Upham Street', '7/12/2020', null),
+(37, 'Jae Gippes', '94666112', 'jgippes10@skyrock.com', '760 Northport Alley', '9/27/2020', null),
+(38, 'Darwin Pillifant', '86795443', 'dpillifant11@issuu.com', '57 Anderson Hill', '6/10/2020', null),
+(39, 'Hi Christensen', '98789416', 'hchristensen12@rakuten.co.jp', '24474 Dapin Court', '9/30/2020', null),
+(40, 'Cordelie Laugheran', '90505833', 'claugheran13@dedecms.com', '473 Carey Alley', '9/20/2020', null),
+(41, 'Isacco Duggan', '82544654', 'ioduggan0@usatoday.com', '1 Sad Street', '9/20/2020', null),
+(42, 'Benton Neville', '12312312', 'gbrowncey3@nus.edu.sg', '2 Sad Street', '8/20/2020', null),
+(43, 'Clare Cardon', '12341234', 'cboleyn4@nus.edu.sg', '3 Sad Street', '7/20/2020', null),
+(44, 'Gilburt Browncey', '44443333', '44443333@nus.edu.sg', '4 Sad Street', '10/20/2020', null),
+(45, 'Carlita Boleyn', '84060493', 'imeijer5@nus.edu.sg', '5 Sad Street', '10/20/2020', null),
+(46, 'Ingeberg Meijer', '95571032', 'pjurges6@nus.edu.sg', '6 Sad Street', '10/20/2020', null);
 
 INSERT INTO Part_time_emp (eid, hourly_rate) VALUES
 (4, 14.50), (7, 8.00), (9, 10.80), (10, 16.00), (12, 12.00),
@@ -92,11 +92,44 @@ INSERT INTO Managers (eid) VALUES
 (8), (11), (13), (16), (18), (19), (22), (27), (30), (34), (42);
 
 
-/**
- * TODO: Pay_slips table to be populated by function calls
- */
-
-
+INSERT INTO pay_slips (eid, payment_date, amount, num_work_days, num_work_hours) VALUES
+-- 2/2021
+(1, '2021-02-28', 5400, 28, null), (2, '2021-02-28', 5450, 28, null),
+(3, '2021-02-28', 5830, 28, null), (5, '2021-02-28', 4590, 28, null),
+(6, '2021-02-28', 3390, 28, null), (8, '2021-02-28', 4800, 28, null),
+(9, '2021-02-28', 10.8, null, 1), (11, '2021-02-28', 6200, 28, null),
+(12, '2021-02-28', 12, null, 1), (13, '2021-02-28', 5490, 28, null),
+(14, '2021-02-28', 6010, 28, null), (15, '2021-02-28', 5480, 28, null),
+(16, '2021-02-28', 5210, 28, null), (17, '2021-02-28', 5000, 28, null),
+(18, '2021-02-28', 4490, 28, null), (19, '2021-02-28', 4500, 28, null),
+(20, '2021-02-28', 3800, 28, null), (22, '2021-02-28', 7700, 28, null),
+(25, '2021-02-28', 2450, 28, null), (26, '2021-02-28', 292.86, 2, null),
+(27, '2021-02-28', 5500, 28, null), (28, '2021-02-28', 714.29, 5, null),
+(30, '2021-02-28', 4320, 28, null), (31, '2021-02-28', 8120, 28, null),
+(32, '2021-02-28', 3800, 28, null), (33, '2021-02-28', 6100, 28, null),
+(34, '2021-02-28', 3910, 28, null), (35, '2021-02-28', 3450, 28, null),
+(36, '2021-02-28', 3650, 28, null), (38, '2021-02-28', 4100, 28, null),
+(39, '2021-02-28', 4210, 28, null), (40, '2021-02-28', 7754, 28, null),
+(42, '2021-02-28', 4000, 28, null), (43, '2021-02-28', 1000, 28, null),
+(45, '2021-02-28', 9999, 28, null), (46, '2021-02-28', 1, 28, null),
+-- 3/2021
+(1, '2021-03-31', 5400, 31, null), (2, '2021-03-31', 5450, 31, null),
+(3, '2021-03-31', 5830, 31, null), (5, '2021-03-31', 4590, 31, null),
+(6, '2021-03-31', 3390, 31, null), (8, '2021-03-31', 4800, 31, null),
+(11, '2021-03-31', 2000, 10, null), (13, '2021-03-31', 5490, 31, null),
+(14, '2021-03-31', 1938.71, 31, null), (15, '2021-03-31', 5480, 31, null),
+(16, '2021-03-31', 5210, 31, null), (17, '2021-03-31', 5000, 31, null),
+(18, '2021-03-31', 4490, 31, null), (19, '2021-03-31', 4500, 31, null),
+(20, '2021-03-31', 3800, 31, null), (22, '2021-03-31', 7700, 31, null),
+(25, '2021-03-31', 2450, 31, null), (26, '2021-03-31', 4100, 31, null),
+(27, '2021-03-31', 5500, 31, null), (28, '2021-03-31', 4000, 31, null),
+(30, '2021-03-31', 4320, 31, null), (31, '2021-03-31', 8120, 31, null),
+(32, '2021-03-31', 3800, 31, null), (33, '2021-03-31', 6100, 31, null),
+(34, '2021-03-31', 3531.61, 28, null), (35, '2021-03-31', 3450, 31, null),
+(36, '2021-03-31', 3650, 31, null), (38, '2021-03-31', 4100, 31, null),
+(39, '2021-03-31', 4210, 31, null), (40, '2021-03-31', 7754, 31, null),
+(42, '2021-03-31', 4000, 31, null), (43, '2021-03-31', 1000, 31, null),
+(45, '2021-03-31', 9999, 31, null), (46, '2021-03-31', 1, 31, null);
 
 /**********************************************
  * Courses & Sessions-related Information
@@ -126,12 +159,12 @@ INSERT INTO Course_areas (area_name, eid) VALUES
 ('Parallel Computing', 19), 
 ('Programming Languages', 27),
 ('Software Engineering', 30),
-('course1', 42),
-('course2', 42),
-('course3', 42),
-('course4', 42),
-('course5', 42),
-('course6', 42);
+('Fundamentals 1', 42),
+('Fundamentals 2', 42),
+('Fundamentals 3', 42),
+('Fundamentals 4', 42),
+('Fundamentals 5', 42),
+('Fundamentals 6', 42);
                                                  
 
 INSERT INTO Specializes (eid, area_name) VALUES
@@ -145,42 +178,43 @@ INSERT INTO Specializes (eid, area_name) VALUES
 (35, 'Computer Networks'), (36, 'Database Systems'),
 (37, 'Software Engineering'), (38, 'Database Systems'),
 (39, 'Artificial Intelligence'), (40, 'Database Systems'),
-(41, 'course1'), (41, 'course2'), (41, 'course3'), (41, 'course4'),(41, 'course5'), (41, 'course6'),
-(44, 'course1'), (44, 'course2'), (44, 'course3'), (44, 'course4'),(44, 'course5'), (44, 'course6'),
-(45, 'course1'), (45, 'course2'), (45, 'course3'), (45, 'course4'),(45, 'course5'), (45, 'course6'),
-(46, 'course1'), (46, 'course2'), (46, 'course3'), (46, 'course4'),(46, 'course5'), (46, 'course6');
+-- All knowing
+(41, 'Fundamentals 1'), (41, 'Fundamentals 2'), (41, 'Fundamentals 3'), (41, 'Fundamentals 4'),(41, 'Fundamentals 5'), (41, 'Fundamentals 6'),
+(44, 'Fundamentals 1'), (44, 'Fundamentals 2'), (44, 'Fundamentals 3'), (44, 'Fundamentals 4'),(44, 'Fundamentals 5'), (44, 'Fundamentals 6'),
+(45, 'Fundamentals 1'), (45, 'Fundamentals 2'), (45, 'Fundamentals 3'), (45, 'Fundamentals 4'),(45, 'Fundamentals 5'), (45, 'Fundamentals 6'),
+(46, 'Fundamentals 1'), (46, 'Fundamentals 2'), (46, 'Fundamentals 3'), (46, 'Fundamentals 4'),(46, 'Fundamentals 5'), (46, 'Fundamentals 6');
 
 
 INSERT INTO Courses (course_id, title, description, area_name, duration) VALUES
-(2102, 'Database Systems', 'Learn about PSQL, Schemas and Relatiional Algebra!', 'Database Systems', 1),
-(3230, 'Design and Analysis of Algorithms', 'Crash course to master Leetcode challenges', 'Algorithms & Theory', 3),
-(3223, 'Database Systems Implementation', 'Learn how to implement a DBMS', 'Database Systems', 2),
-(3243, 'Intro to AI', 'Pick up the basics of AI and automate your lifestyle', 'Artificial Intelligence', 2),
-(3247, 'Game Development', 'Learn to create your own game in this 2 hour course', 'Computer Graphics & Games', 2),
-(2107, 'Intro to Information Security', 'Learn about the basics of ethical hacking', 'Computer Security', 1),
-(2105, 'Intro to Computer Networks', 'Are you sure you know how the internet works?', 'Computer Networks', 1),
-(5224, 'Cloud Computing', 'Jump onto the hype and learn more about Cloud Technology', 'Parallel Computing', 3),
-(2104, 'Programming Language Concepts', 'Learn up to 8 different programming languages in an hour', 'Programming Languages', 1),
-(2103, 'Software Engineering', 'Hello, I am Duke, lets learn to build an address book!', 'Software Engineering', 1),
-(1, 'course1', 'c1', 'course1', 3),
-(2, 'course2', 'c2', 'course2', 3),
-(3, 'course3', 'c3', 'course3', 3),
-(4, 'course4', 'c4', 'course4', 3),
-(5, 'course5', 'c5', 'course5', 3),
-(6, 'course6', 'c6', 'course6', 3);
+(1, 'Fundamentals 1', 'Learn your CS fundamentals', 'Fundamentals 1', 3),
+(2, 'Fundamentals 2', 'Learn your CS fundamentals', 'Fundamentals 2', 3),
+(3, 'Fundamentals 3', 'Learn your CS fundamentals', 'Fundamentals 3', 3),
+(4, 'Fundamentals 4', 'Learn your CS fundamentals', 'Fundamentals 4', 3),
+(5, 'Fundamentals 5', 'Learn your CS fundamentals', 'Fundamentals 5', 3),
+(6, 'Fundamentals 6', 'Learn your CS fundamentals', 'Fundamentals 6', 3),
+(7, 'Database Systems', 'Learn about PSQL, Schemas and Relatiional Algebra!', 'Database Systems', 1),
+(8, 'Design and Analysis of Algorithms', 'Crash course to master Leetcode challenges', 'Algorithms & Theory', 3),
+(9, 'Database Systems Implementation', 'Learn how to implement a DBMS', 'Database Systems', 2),
+(10, 'Intro to AI', 'Pick up the basics of AI and automate your lifestyle', 'Artificial Intelligence', 2),
+(11, 'Game Development', 'Learn to create your own game in this 2 hour course', 'Computer Graphics & Games', 2),
+(12, 'Intro to Information Security', 'Learn about the basics of ethical hacking', 'Computer Security', 1),
+(13, 'Intro to Computer Networks', 'Are you sure you know how the internet works?', 'Computer Networks', 1),
+(14, 'Cloud Computing', 'Jump onto the hype and learn more about Cloud Technology', 'Parallel Computing', 3),
+(15, 'Programming Language Concepts', 'Learn up to 8 different programming languages in an hour', 'Programming Languages', 1),
+(16, 'Software Engineering', 'Hello, I am Duke, lets learn to build an address book!', 'Software Engineering', 1);
 
 INSERT INTO Offerings (launch_date, course_id, registration_deadline, start_date, end_date, eid, target_number_registrations, seating_capacity, fees) VALUES
-('12/24/2020', 2102, '1/28/2021', '2/11/2021', '2/12/2021', 32, 85, 1000, 181.40),
-('2/7/2021', 2103, '3/27/2021', '4/8/2021', '4/8/2021', 15, 70, 250, 55.65),
-('1/8/2021', 3223, '2/7/2021', '2/17/2021', '2/17/2021', 1, 58, 200, 136.50),
-('11/16/2020', 5224, '12/12/2020', '12/30/2020', '4/20/2021', 3, 75, 500, 68.50),
-('3/16/2021', 5224, '5/2/2021', '5/28/2021', '5/28/2021', 3, 75, 250, 69.50),
-('3/4/2021', 3243, '5/8/2021', '5/18/2021', '5/18/2021', 28, 80, 100, 186.00),
-('3/11/2021', 2105, '4/26/2021', '5/14/2021', '5/14/2021', 28, 50, 400, 91.00),
-('12/13/2020', 2104, '1/30/2021', '2/12/2021', '2/12/2021', 6, 50, 250, 187.30),
-('2/13/2021', 2102, '4/7/2021', '4/19/2021', '4/19/2021', 33, 55, 200, 75.50),
-('3/7/2020', 3247, '4/28/2021', '5/10/2021', '5/10/2021', 33, 68, 100, 155.50),
-('4/18/2021', 3230, '5/10/2021', '5/20/2021', '5/20/2021', 17, 100, 500, 137.77),
+('12/24/2020', 7, '1/28/2021', '2/11/2021', '2/12/2021', 32, 85, 1000, 181.40),
+('2/7/2021', 16, '3/27/2021', '4/8/2021', '4/8/2021', 15, 70, 250, 55.65),
+('1/8/2021', 9, '2/7/2021', '2/17/2021', '2/17/2021', 1, 58, 200, 136.50),
+('11/16/2020', 14, '12/12/2020', '12/30/2020', '4/20/2021', 3, 75, 500, 68.50),
+('3/16/2021', 14, '5/2/2021', '5/28/2021', '5/28/2021', 3, 75, 250, 69.50),
+('3/4/2021', 10, '5/8/2021', '5/18/2021', '5/18/2021', 28, 80, 100, 186.00),
+('3/11/2021', 13, '4/26/2021', '5/14/2021', '5/14/2021', 28, 50, 400, 91.00),
+('12/13/2020', 15, '1/30/2021', '2/12/2021', '2/12/2021', 6, 50, 250, 187.30),
+('2/13/2021', 7, '4/7/2021', '4/19/2021', '4/19/2021', 33, 55, 200, 75.50),
+('3/7/2020', 11, '4/28/2021', '5/10/2021', '5/10/2021', 33, 68, 100, 155.50),
+('4/18/2021', 8, '5/10/2021', '5/20/2021', '5/20/2021', 17, 100, 500, 137.77),
 ('4/1/2021', 1, '4/10/2021', '4/20/2021', '4/30/2021', 43, 100, 250, 250),
 ('4/2/2021', 2, '4/11/2021', '4/21/2021', '4/30/2021', 43, 100, 250, 250),
 ('4/1/2021', 3, '4/10/2021', '4/20/2021', '4/30/2021', 43, 100, 250, 250),
@@ -190,19 +224,19 @@ INSERT INTO Offerings (launch_date, course_id, registration_deadline, start_date
 
 INSERT INTO Sessions (sid, launch_date, course_id, session_date, start_time, end_time, rid, eid)
 VALUES
-(1, '12/24/2020', 2102, '2/11/2021', '10:00', '11:00', 1, 36),
-(2, '12/24/2020', 2102, '2/11/2021', '14:00', '15:00', 1, 9),
-(3, '12/24/2020', 2102, '2/12/2021', '15:00', '16:00', 2, 38),
-(1, '2/7/2021', 2103, '4/8/2021', '17:00', '18:00', 5, 20),
-(1, '1/8/2021', 3223, '2/17/2021', '15:00', '17:00', 4, 38),
-(1, '11/16/2020', 5224, '12/30/2020', '14:00', '17:00', 1, 24),
-(1, '3/16/2021', 5224, '5/18/2021', '14:00', '17:00', 1, 24),
-(1, '3/4/2021', 3243, '5/18/2021', '15:00', '17:00', 8, 7),
-(1, '3/11/2021', 2105, '5/4/2021', '10:00', '11:00', 8, 10),
-(1, '12/13/2020', 2104, '2/12/2021', '14:00', '15:00', 1 ,12),
-(1, '2/13/2021', 2102, '4/19/2021', '11:00', '12:00', 4, 9),
-(1, '3/7/2020', 3247, '5/10/2021', '16:00', '18:00', 10, 21),
-(1, '4/18/2021', 3230, '5/20/2021', '15:00', '18:00', 2, 2),
+(1, '12/24/2020', 7, '2/11/2021', '10:00', '11:00', 1, 36),
+(2, '12/24/2020', 7, '2/11/2021', '14:00', '15:00', 1, 9),
+(3, '12/24/2020', 7, '2/12/2021', '15:00', '16:00', 2, 38),
+(1, '2/7/2021', 16, '4/8/2021', '17:00', '18:00', 5, 20),
+(1, '1/8/2021', 9, '2/17/2021', '15:00', '17:00', 4, 38),
+(1, '11/16/2020', 14, '12/30/2020', '14:00', '17:00', 1, 24),
+(1, '3/16/2021', 14, '5/18/2021', '14:00', '17:00', 1, 24),
+(1, '3/4/2021', 10, '5/18/2021', '15:00', '17:00', 8, 7),
+(1, '3/11/2021', 13, '5/4/2021', '10:00', '11:00', 8, 10),
+(1, '12/13/2020', 15, '2/12/2021', '14:00', '15:00', 1 ,12),
+(1, '2/13/2021', 7, '4/19/2021', '11:00', '12:00', 4, 9),
+(1, '3/7/2020', 11, '5/10/2021', '16:00', '18:00', 10, 21),
+(1, '4/18/2021', 8, '5/20/2021', '15:00', '18:00', 2, 2),
 -- this makes eid = 41 part time teach = 30 hours
 (1, '4/1/2021', 1, '4/26/2021', '09:00', '12:00', 1, 41),
 (2, '4/1/2021', 1, '4/26/2021', '14:00', '17:00', 1, 41),
@@ -281,7 +315,8 @@ VALUES
 
 
 INSERT INTO Credit_cards (card_number, CVV, expiry_date, from_date, cust_id) VALUES
-('5578550114063345', '294', '12/17/2021', '08/26/2020', 1), 
+('5578550114063345', '294', '12/17/2021', '02/20/2021', 1),
+('5368550114163345', '334', '2/18/2021', '07/27/2020', 1),
 ('349448959736043', '870', '01/09/2024', '02/10/2020', 2), 
 ('5413117284994490', '431', '12/15/2023', '02/29/2020', 3), 
 ('5306212867742703', '397', '09/29/2025', '04/09/2020', 4), 
@@ -374,5 +409,15 @@ VALUES
 /**
  * TODO: Buys, Redeems, Registers and Cancels data generation not done (Not critical)
  */
-insert into registers values ('2020-12-15', 2, 349448959736043, 1, '2020-11-16', 5224);
-END;
+ 
+INSERT INTO Buys (buy_date, cust_id, card_number, package_id, num_remaining_redemptions) VALUES 
+('2021-1-10', 1, '5368550114163345', 7, 9);
+                                                                                                
+INSERT INTO Registers (register_date, cust_id, card_number, sid, launch_date, course_id) VALUES
+('2020-12-15', 2, '349448959736043', 1, '2020-11-16', 14);
+
+
+INSERT INTO Redeems (redeem_date, buy_date, cust_id, package_id, sid, launch_date, course_id) VALUES
+('2021-1-20', '2021-1-10', 1, 7, 3, '12/24/2020', 7);
+
+COMMIT;
