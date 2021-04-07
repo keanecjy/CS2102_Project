@@ -265,7 +265,7 @@ CREATE TABLE Redeems
     launch_date date,
     course_id   int,
 
-    -- Enforces the a customer can register for at most one of its sessions?
+    -- Enforces the a customer can register for at most one of its sessions
     unique (cust_id, course_id, launch_date),
     primary key (redeem_date, buy_date, cust_id, package_id, sid, launch_date, course_id),
     foreign key (buy_date, cust_id, package_id) references Buys,
@@ -286,7 +286,7 @@ CREATE TABLE Registers
     launch_date 	date,
     course_id 		int,
 
-    -- Enforces the a customer can register for at most one of its sessions?
+    -- Enforces the a customer can register for at most one of its sessions
     unique (cust_id, course_id, launch_date),
     primary key (register_date, cust_id, sid, launch_date, course_id),
     foreign key (cust_id, card_number) references Credit_cards (cust_id, card_number),

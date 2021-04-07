@@ -380,7 +380,7 @@ $$
 WITH NumRegistered AS (SELECT course_id, launch_date, COUNT(*) AS numReg
                        FROM combine_reg_redeems()
                        GROUP BY course_id, launch_date),
-     ValidOfferings AS (SELECT course_id, title, area_name, COALESCE(numReg, 0) AS numReg, start_date 
+     ValidOfferings AS (SELECT course_id, title, area_name, COALESCE(numReg, 0) AS numReg, start_date
                         FROM (Offerings NATURAL LEFT JOIN NumRegistered)
                                  NATURAL JOIN Courses
                         WHERE (EXTRACT(YEAR FROM start_date)) = (EXTRACT(YEAR FROM CURRENT_DATE)))
