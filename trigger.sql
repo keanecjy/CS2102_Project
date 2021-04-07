@@ -553,7 +553,7 @@ BEGIN
         END IF;
 
     END IF;
-
+    RETURN NULL;
 END;
 $$ language plpgsql;
 
