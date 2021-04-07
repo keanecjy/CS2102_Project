@@ -239,7 +239,8 @@ SELECT title, area_name, start_date, end_date, registration_deadline, fees, seat
 FROM (Courses NATURAL JOIN Offerings)
          NATURAL LEFT JOIN NumRegistered
 WHERE registration_deadline >= CURRENT_DATE
-  AND seating_capacity - COALESCE(numReg, 0) > 0;
+  AND seating_capacity - COALESCE(numReg, 0) > 0
+ORDER BY registration_deadline, title;
 
 $$ LANGUAGE sql;
 
@@ -261,8 +262,9 @@ FROM (Sessions NATURAL JOIN Rooms)
          NATURAL JOIN Employees
 WHERE course_id = cid
   AND launch_date = date_of_launch
-  AND session_date >= CURRENT_DATE
-  AND seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid) > 0;
+  AND (session_date > CURRENT_DATE OR session_date = CURRENT_DATE AND start_time >= CURRENT_TIME)
+  AND seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid) > 0
+ORDER BY session_date, start_time;
 
 $$ LANGUAGE sql;
 
@@ -323,7 +325,7 @@ $$
 WITH InActiveCust AS (SELECT cust_id, name
                       FROM combine_reg_redeems() NATURAL join Customers
                       GROUP BY cust_id, name
-                      HAVING MAX(register_date) + INTERVAL '5 months' < DATE_TRUNC('month', CURRENT_DATE)),
+                      HAVING MAX(register_date) - interval '6 months'),
      CustWithNoOfferings AS (SELECT cust_id, name
                              FROM Customers
                              WHERE cust_id NOT IN (SELECT cust_id FROM combine_reg_redeems())),
