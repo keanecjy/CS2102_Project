@@ -384,6 +384,7 @@ $$
 DECLARE
     deadline       date;
     s_date         date;
+    s_time         time;
     seat_cap       int;
     num_registered int;
 
@@ -395,8 +396,8 @@ BEGIN
     WHERE launch_date = new.launch_date
       AND course_id = new.course_id;
 
-    SELECT seating_capacity, session_date
-    INTO seat_cap, s_date
+    SELECT seating_capacity, session_date, start_time
+    INTO seat_cap, s_date, s_time
     FROM Sessions
              NATURAL JOIN Rooms
     WHERE new.sid = sid
@@ -417,7 +418,7 @@ BEGIN
                                           AND new.cust_id = cust_id);
 
     -- Check if current_date have already past the session_date or registration deadline
-    IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
+    IF (CURRENT_DATE > s_date OR (CURRENT_DATE = s_date AND CURRENT_TIME > s_time) OR CURRENT_DATE > deadline) THEN
         RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
     
