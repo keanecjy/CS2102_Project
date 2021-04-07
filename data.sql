@@ -412,7 +412,8 @@ VALUES
  
 INSERT INTO Buys (buy_date, cust_id, card_number, package_id, num_remaining_redemptions) VALUES 
 ('2021-1-10', 1, '5368550114163345', 7, 9);
-                                                                                                
+
+
 INSERT INTO Registers (register_date, cust_id, card_number, sid, launch_date, course_id) VALUES
 ('2020-12-15', 2, '349448959736043', 1, '2020-11-16', 14);
 

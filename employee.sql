@@ -118,7 +118,7 @@ $$ LANGUAGE plpgsql;
 
 -- Number of work hours for a part-time instructor is computed based on the number of hours
 -- the part-time instructor taught at all sessions for that particular month and year.
-CREATE OR REPLACE FUNCTION pay_salary(my_date date)
+CREATE OR REPLACE FUNCTION pay_salary()
 RETURNS TABLE(_eid int, _name text, _status text, _num_work_days int, _num_work_hours int,
     _hourly_rate float, _monthly_salary float, _amount numeric) AS $$
 DECLARE
@@ -133,8 +133,8 @@ DECLARE
     _last_work_day int;
     _pay_date date;
 BEGIN
-    _pay_month := extract(month from my_date)::int;
-    _pay_year := extract(year from my_date)::int;
+    _pay_month := extract(month from current_date)::int;
+    _pay_year := extract(year from current_date)::int;
 
     open curs;
     loop
