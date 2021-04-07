@@ -52,7 +52,6 @@ BEGIN
         -- iterate to previous month
         _date_ptr := _date_ptr - interval '1 month';
         N := N - 1;
-       _total_registration_fees := _total_registration_fees + _total_refunded_registration_fees;
 
         return next;
 

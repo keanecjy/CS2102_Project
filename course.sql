@@ -72,7 +72,7 @@ BEGIN
         primary key (session_date, start_time, rid, eid)
     ) ON COMMIT DROP;
 
-    ASSERT (select count(*) from assignment_table) = 0;
+    -- ASSERT (select count(*) from assignment_table) = 0;
 
     FOREACH temp SLICE 1 IN ARRAY sessions_arr
     LOOP
@@ -98,7 +98,7 @@ BEGIN
     -- Assign instructors and add sessions into sessions table
     WHILE EXISTS (SELECT 1 FROM assignment_table) LOOP
 
-        -- Greedily select an assignment by choosing least choice_count followed by desire_count
+        -- Greedily select an assignment by choosing least choice_count followed by least desire_count
         -- Choice_count refers to number of possible instructor assignments for a given session
         -- Desire count refers to the number of clashes with other assignments
         WITH weighted_choice AS (
@@ -138,8 +138,17 @@ BEGIN
         -- 2. Remove all assignments that clashes with the chosen session (same room, eid and clashing time w breaks)
         DELETE FROM assignment_table
         WHERE (chosen_session.session_date, chosen_session.start_time, chosen_session.rid) = (session_date, start_time, rid) OR
-              (chosen_session.session_date, chosen_session.eid) = (session_date, eid) AND
-              (chosen_session.start_time - one_hour, chosen_session.end_time + one_hour) OVERLAPS (start_time, end_time);
+              ((chosen_session.session_date, chosen_session.eid) = (session_date, eid) AND
+              (chosen_session.start_time - one_hour, chosen_session.end_time + one_hour) OVERLAPS (start_time, end_time));
+
+        -- 3. Remove all part-time instructors who exceed the 30h limit in a month
+        IF (chosen_session.eid in (SELECT * FROM Part_time_instructors) AND
+            get_hours(chosen_session.eid, chosen_session.session_date) + course_duration > 30) THEN
+
+            DELETE FROM assignment_table
+            WHERE chosen_session.eid = eid AND
+                  EXTRACT (MONTH FROM chosen_session.session_date) = EXTRACT (MONTH FROM session_date);
+        END IF;
 
 
         -- Update course offering-related data (start_date, end_date and seat_capacity)
