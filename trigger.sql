@@ -415,9 +415,9 @@ BEGIN
                                         WHERE new.launch_date = launch_date
                                           AND new.course_id = course_id
                                           AND new.cust_id = cust_id);
-
+ 
     -- Check if current_date have already past the session_date or registration deadline
-    IF (CURRENT_DATE > s_date OR CURRENT_DATE > deadline) THEN
+    IF (NEW.register_date > deadline) THEN
         RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
 
@@ -583,3 +583,19 @@ $$ language plpgsql;
 CREATE CONSTRAINT TRIGGER check_valid_package
 AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION check_valid_package();
+
+
+CREATE OR REPLACE FUNCTION cancel_timing_checks()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF (NEW.cancel_date > now()) THEN
+        RAISE EXCEPTION 'You cant add a Cancel information into the future';
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER cancel_timing_checks
+AFTER INSERT OR UPDATE ON Cancels
+FOR EACH ROW EXECUTE FUNCTION cancel_timing_checks();
