@@ -384,7 +384,6 @@ $$
 DECLARE
     deadline       date;
     s_date         date;
-    s_time         time;
     seat_cap       int;
     num_registered int;
 
@@ -396,8 +395,8 @@ BEGIN
     WHERE launch_date = new.launch_date
       AND course_id = new.course_id;
 
-    SELECT seating_capacity, session_date, start_time
-    INTO seat_cap, s_date, s_time
+    SELECT seating_capacity, session_date
+    INTO seat_cap, s_date
     FROM Sessions
              NATURAL JOIN Rooms
     WHERE new.sid = sid
@@ -416,9 +415,9 @@ BEGIN
                                         WHERE new.launch_date = launch_date
                                           AND new.course_id = course_id
                                           AND new.cust_id = cust_id);
-
+ 
     -- Check if current_date have already past the session_date or registration deadline
-    IF (CURRENT_DATE > s_date OR (CURRENT_DATE = s_date AND CURRENT_TIME > s_time) OR CURRENT_DATE > deadline) THEN
+    IF (NEW.register_date > deadline) THEN
         RAISE EXCEPTION 'It is too late to register for this session!';
     END IF;
     
@@ -561,3 +560,18 @@ $$ language plpgsql;
 CREATE CONSTRAINT TRIGGER modify_redeem_check
 AFTER INSERT OR UPDATE OR DELETE ON Redeems DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION modify_redeem_check();
+
+CREATE OR REPLACE FUNCTION cancel_timing_checks()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF (NEW.cancel_date > now()) THEN
+        RAISE EXCEPTION 'You cant add a Cancel information into the future';
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER cancel_timing_checks
+AFTER INSERT OR UPDATE ON Cancels
+FOR EACH ROW EXECUTE FUNCTION cancel_timing_checks();
