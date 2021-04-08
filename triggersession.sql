@@ -257,7 +257,7 @@ BEGIN
     END IF;
 
     IF (is_departed(NEW.eid, NEW.session_date)) THEN
-        RAISE EXCEPTION 'This instructor will have already departed before this session and cant teach it anymore';
+        RAISE EXCEPTION 'This instructor would have departed before this session and cant teach it anymore';
     END IF;
     RETURN NULL;
 END;

@@ -28,8 +28,8 @@ $$ language plpgsql;
  * get_available_course_packages(): used to retrieve course packages that are available for sale
  */
 CREATE OR REPLACE FUNCTION get_available_course_packages()
-RETURNS TABLE (id int, name text, num_free_course_sessions int, end_date date, price numeric) AS $$
-    select package_id, name, num_free_registrations, sale_end_date, price
+RETURNS TABLE (name text, num_free_course_sessions int, end_date date, price numeric) AS $$
+    select name, num_free_registrations, sale_end_date, price
     from course_packages
     where current_date between sale_start_date and sale_end_date
     order by sale_end_date asc;
@@ -53,6 +53,10 @@ BEGIN
     select num_free_registrations into n_redemptions
     from Course_packages C
     where C.package_id = pid;
+
+    if not found then
+        raise exception 'Course package % does not exist', pid;
+    end if;
 
     -- buying course package
     insert into Buys

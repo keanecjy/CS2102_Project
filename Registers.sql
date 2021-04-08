@@ -12,9 +12,6 @@ BEGIN
      * 4) If redeems, check if the number of redeems of that package_id < num_free_registrations. Means check if package is active?
      * 5) Check if there is any session of this course that exist before (In unique_session_per_course_redeem_checks AND unique_session_per_course_register_checks)
      */
-    /*
-     * Dont need to check validity of buy_date, pid, card_number, session_number, cid, date_of_launch etc as it should be check via the foreign key?
-     */
 
     IF (pay_method = 'redeem') THEN
 

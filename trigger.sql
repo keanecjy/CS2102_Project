@@ -373,8 +373,8 @@ FOR EACH ROW EXECUTE FUNCTION at_most_one_package();
 
 /*
 Trigger to check for inserting/updating a registration/redemption of session.
-1) Check if current_date have already past the session_date itself
-2) Check if current_date have already past the registration_deadline
+1) Check if register_date have already past the session_date itself
+2) Check if register_date have already past the registration_deadline
 3) Check if number of registration + redeems <= seating_capacity
 4) Check if customer register for more than 1 session in this course offering.
 */
@@ -415,10 +415,17 @@ BEGIN
                                         WHERE new.launch_date = launch_date
                                           AND new.course_id = course_id
                                           AND new.cust_id = cust_id);
- 
-    -- Check if current_date have already past the session_date or registration deadline
-    IF (NEW.register_date > deadline) THEN
-        RAISE EXCEPTION 'It is too late to register for this session!';
+
+    -- Check if register_date have already past the session_date or registration deadline
+    IF (TG_TABLE_NAME = 'registers') THEN
+        IF (NEW.register_date > deadline) THEN
+            RAISE EXCEPTION 'It is too late to register for this session!';
+        END IF;
+    ELSE
+        -- redeems
+        IF (NEW.redeem_date > deadline) THEN
+            RAISE EXCEPTION 'It is too late to register for this session!';
+        END IF;
     END IF;
 
     -- Check if there is enough slots in the session

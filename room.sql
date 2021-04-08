@@ -101,7 +101,9 @@ BEGIN
                     end if;
                 end loop;
 
-                return next;
+                if (array_length(_available_hours, 1) > 0) then
+                    return next;
+                end if;
             end if;
 
             _loop_date := _loop_date + 1;
