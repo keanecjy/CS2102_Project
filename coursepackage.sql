@@ -152,14 +152,14 @@ BEGIN
     select date_part into current_year
     from date_part('year', current_date);
 
-    create temp table if not exists temp as
+    create temporary table if not exists temp_table on commit drop as
         select P.*, coalesce(count(buy_date), 0) as number_sold
         from Course_packages P natural left join Buys B
         where date_part('year', sale_start_date) = current_year
         group by P.package_id;
 
     open curs for (
-        select * from temp
+        select * from temp_table
         order by number_sold desc, price desc
     );
 
@@ -177,7 +177,9 @@ BEGIN
         number_sold := r.number_sold;
 
         prev_sold := number_sold;
-
+        if (n > 0) then
+            n := n - 1;
+        end if;
         return next;
     end loop;
 END
