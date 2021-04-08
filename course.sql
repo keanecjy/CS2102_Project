@@ -33,13 +33,11 @@ DECLARE
     eid_rec             record;
     chosen_session      record;
     one_hour            interval;
-
     course_area         text;
     course_duration     int;
     earliest_start_date date;
     latest_end_date     date;
     seat_capacity       int;
-
     next_sid            int;
     s_date              date;
     s_time              time;
@@ -49,11 +47,12 @@ BEGIN
     assigned_count := ARRAY_LENGTH(sessions_arr, 1);
 
     -- 	Checking validity of course offering information
-    IF (assigned_count = 0 or reg_deadline < current_date) THEN
+    IF (assigned_count = 0 OR reg_deadline < CURRENT_DATE) THEN
         RAISE EXCEPTION 'Course offering details are invalid';
     END IF;
 
-    SELECT area_name, duration INTO course_area, course_duration
+    SELECT area_name, duration
+    INTO course_area, course_duration
     FROM Courses
     WHERE course_id = cid;
 
@@ -62,105 +61,115 @@ BEGIN
 
     seat_capacity := 0;
 
-    CREATE TEMPORARY TABLE IF NOT EXISTS assignment_table (
+    CREATE TEMPORARY TABLE IF NOT EXISTS assignment_table
+    (
         session_date date,
-        start_time time,
-        end_time time,
-        rid int,
-        eid int,
+        start_time   time,
+        end_time     time,
+        rid          int,
+        eid          int,
 
-        primary key (session_date, start_time, rid, eid)
+        PRIMARY KEY (session_date, start_time, rid, eid)
     ) ON COMMIT DROP;
 
     -- ASSERT (select count(*) from assignment_table) = 0;
 
     FOREACH temp SLICE 1 IN ARRAY sessions_arr
-    LOOP
-        s_date := temp[1]::date;
-        s_time := temp[2]::time;
-        s_rid := temp[3]::int;
+        LOOP
+            s_date := temp[1]::date;
+            s_time := temp[2]::time;
+            s_rid := temp[3]::int;
 
-        IF (ARRAY_LENGTH(temp, 1) <> 3) THEN
-            RAISE EXCEPTION 'Please provide the session date, start time and room identifier for each session';
-        END IF;
+            IF (ARRAY_LENGTH(temp, 1) <> 3) THEN
+                RAISE EXCEPTION 'Please provide the session date, start time and room identifier for each session';
+            END IF;
 
-        -- Add all possible session assignments into assignment table
-        FOR eid_rec IN (SELECT * FROM find_instructors(cid, s_date, s_time)) LOOP
-            INSERT INTO assignment_table
-            VALUES (s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid, eid_rec.eid);
+            -- Add all possible session assignments into assignment table
+            FOR eid_rec IN (SELECT * FROM find_instructors(cid, s_date, s_time))
+                LOOP
+                    INSERT INTO assignment_table
+                    VALUES (s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid, eid_rec.eid);
 
-            RAISE INFO 'Instructor % for course %, session % %', eid_rec.eid, cid, s_date, s_time;
+                    RAISE INFO 'Instructor % for course %, session % %', eid_rec.eid, cid, s_date, s_time;
+                END LOOP;
         END LOOP;
-    END LOOP;
 
     next_sid := 1;
 
     -- Assign instructors and add sessions into sessions table
-    WHILE EXISTS (SELECT 1 FROM assignment_table) LOOP
-
+    WHILE EXISTS(SELECT 1 FROM assignment_table)
+        LOOP
         -- Greedily select an assignment by choosing least choice_count followed by least desire_count
         -- Choice_count refers to number of possible instructor assignments for a given session
         -- Desire count refers to the number of clashes with other assignments
-        WITH weighted_choice AS (
-            -- number of instructor choices for a session
-            SELECT session_date, start_time, rid, count(*) as choice_count
+            WITH weighted_choice AS (
+                -- number of instructor choices for a session
+                SELECT session_date, start_time, rid, COUNT(*) AS choice_count
+                FROM assignment_table
+                GROUP BY (session_date, start_time, rid)
+            ),
+                 weighted_desire AS (
+                     SELECT DISTINCT session_date,
+                                     start_time,
+                                     eid,
+                                     (SELECT COUNT(*)
+                                      FROM assignment_table B
+                                      WHERE (A.session_date, A.eid) = (B.session_date, B.eid)
+                                        AND (A.start_time - one_hour, A.end_time + one_hour) OVERLAPS
+                                            (B.start_time, B.end_time)
+                                     ) AS desire_count
+                     FROM assignment_table A
+                 )
+            SELECT *
+            INTO chosen_session
             FROM assignment_table
-            GROUP BY (session_date, start_time, rid)
-        ), weighted_desire AS (
-            SELECT DISTINCT
-                session_date,
-                start_time,
-                eid,
-                (SELECT count(*)
-                 FROM assignment_table B
-                 WHERE (A.session_date, A.eid) = (B.session_date, B.eid) AND
-                        (A.start_time - one_hour, A.end_time + one_hour) OVERLAPS (B.start_time, B.end_time)
-                ) as desire_count
-            FROM assignment_table A
-        )
-        SELECT * INTO chosen_session
-        FROM assignment_table NATURAL JOIN weighted_choice NATURAL JOIN weighted_desire
-        ORDER BY choice_count asc, desire_count asc
-        LIMIT 1;
+                     NATURAL JOIN weighted_choice
+                     NATURAL JOIN weighted_desire
+            ORDER BY choice_count ASC, desire_count ASC
+            LIMIT 1;
 
-        -- Add chosen assignment to session
-        INSERT INTO Sessions
-        VALUES (next_sid, l_date, cid,
-                chosen_session.session_date, chosen_session.start_time, chosen_session.end_time,
-                chosen_session.rid, chosen_session.eid);
+            -- Add chosen assignment to session
+            INSERT INTO Sessions
+            VALUES (next_sid, l_date, cid,
+                    chosen_session.session_date, chosen_session.start_time, chosen_session.end_time,
+                    chosen_session.rid, chosen_session.eid);
 
-        -- Update information for next iteration
-        next_sid := next_sid + 1;
-        assigned_count := assigned_count - 1;
+            -- Update information for next iteration
+            next_sid := next_sid + 1;
+            assigned_count := assigned_count - 1;
 
-        -- Update assignment table remove clashing slots if
-        -- 1. Remove all assignments that assigns to the chosen session
-        -- 2. Remove all assignments that clashes with the chosen session (same room, eid and clashing time w breaks)
-        DELETE FROM assignment_table
-        WHERE (chosen_session.session_date, chosen_session.start_time, chosen_session.rid) = (session_date, start_time, rid) OR
-              ((chosen_session.session_date, chosen_session.eid) = (session_date, eid) AND
-              (chosen_session.start_time - one_hour, chosen_session.end_time + one_hour) OVERLAPS (start_time, end_time));
+            -- Update assignment table remove clashing slots if
+            -- 1. Remove all assignments that assigns to the chosen session
+            -- 2. Remove all assignments that clashes with the chosen session (same room, eid and clashing time w breaks)
+            DELETE
+            FROM assignment_table
+            WHERE (chosen_session.session_date, chosen_session.start_time, chosen_session.rid) =
+                  (session_date, start_time, rid)
+               OR ((chosen_session.session_date, chosen_session.eid) = (session_date, eid) AND
+                   (chosen_session.start_time - one_hour, chosen_session.end_time + one_hour) OVERLAPS
+                   (start_time, end_time));
 
-        -- 3. Remove all part-time instructors who exceed the 30h limit in a month
-        IF (chosen_session.eid in (SELECT * FROM Part_time_instructors) AND
-            get_hours(chosen_session.eid, chosen_session.session_date) + course_duration > 30) THEN
+            -- 3. Remove all part-time instructors who exceed the 30h limit in a month
+            IF (chosen_session.eid IN (SELECT * FROM Part_time_instructors) AND
+                get_hours(chosen_session.eid, chosen_session.session_date) + course_duration > 30) THEN
 
-            DELETE FROM assignment_table
-            WHERE chosen_session.eid = eid AND
-                  EXTRACT (MONTH FROM chosen_session.session_date) = EXTRACT (MONTH FROM session_date);
-        END IF;
+                DELETE
+                FROM assignment_table
+                WHERE chosen_session.eid = eid
+                  AND EXTRACT(MONTH FROM chosen_session.session_date) = EXTRACT(MONTH FROM session_date);
+            END IF;
 
 
-        -- Update course offering-related data (start_date, end_date and seat_capacity)
-        IF (earliest_start_date IS NULL OR earliest_start_date > s_date) THEN
-            earliest_start_date := s_date;
-        END IF;
+            -- Update course offering-related data (start_date, end_date and seat_capacity)
+            IF (earliest_start_date IS NULL OR earliest_start_date > s_date) THEN
+                earliest_start_date := s_date;
+            END IF;
 
-        IF (latest_end_date IS NULL OR latest_end_date < s_date) THEN
-            latest_end_date := s_date;
-        END IF;
+            IF (latest_end_date IS NULL OR latest_end_date < s_date) THEN
+                latest_end_date := s_date;
+            END IF;
 
-        seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
+            seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
 
 
         END LOOP;
@@ -239,7 +248,8 @@ SELECT title, area_name, start_date, end_date, registration_deadline, fees, seat
 FROM (Courses NATURAL JOIN Offerings)
          NATURAL LEFT JOIN NumRegistered
 WHERE registration_deadline >= CURRENT_DATE
-  AND seating_capacity - COALESCE(numReg, 0) > 0;
+  AND seating_capacity - COALESCE(numReg, 0) > 0
+ORDER BY registration_deadline, title;
 
 $$ LANGUAGE sql;
 
@@ -261,8 +271,9 @@ FROM (Sessions NATURAL JOIN Rooms)
          NATURAL JOIN Employees
 WHERE course_id = cid
   AND launch_date = date_of_launch
-  AND session_date >= CURRENT_DATE
-  AND seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid) > 0;
+  AND (session_date > CURRENT_DATE OR session_date = CURRENT_DATE AND start_time >= CURRENT_TIME)
+  AND seating_capacity - get_num_registration_for_session(sid, date_of_launch, cid) > 0
+ORDER BY session_date, start_time;
 
 $$ LANGUAGE sql;
 
@@ -288,7 +299,7 @@ BEGIN
           AND launch_date = date_launch;
     ELSE
         UPDATE Registers
-        SET sid         = new_sid,
+        SET sid           = new_sid,
             register_date = CURRENT_DATE
         WHERE cust_id = customer_id
           AND course_id = cid
@@ -321,9 +332,10 @@ CREATE OR REPLACE FUNCTION promote_courses()
 AS
 $$
 WITH InActiveCust AS (SELECT cust_id, name
-                      FROM combine_reg_redeems() NATURAL join Customers
+                      FROM combine_reg_redeems()
+                               NATURAL JOIN Customers
                       GROUP BY cust_id, name
-                      HAVING MAX(register_date) + INTERVAL '5 months' < DATE_TRUNC('month', CURRENT_DATE)),
+                      HAVING MAX(register_date) - INTERVAL '6 months'),
      CustWithNoOfferings AS (SELECT cust_id, name
                              FROM Customers
                              WHERE cust_id NOT IN (SELECT cust_id FROM combine_reg_redeems())),
