@@ -286,6 +286,10 @@ Q19
 CREATE OR REPLACE PROCEDURE update_course_session(customer_id int, cid int, date_launch date, new_sid int) AS
 $$
 BEGIN
+    IF (NOT EXISTS(SELECT 1 FROM Customers where cust_id = customer_id)) THEN
+        RAISE EXCEPTION 'Customer % does not exist', customer_id;
+    END IF;
+
     IF (EXISTS(
             SELECT 1 FROM Redeems WHERE cust_id = customer_id AND course_id = cid AND launch_date = date_launch)) THEN
 
@@ -295,13 +299,16 @@ BEGIN
         WHERE cust_id = customer_id
           AND course_id = cid
           AND launch_date = date_launch;
-    ELSE
+    ELSIF (EXISTS(
+            SELECT 1 FROM registers WHERE cust_id = customer_id AND course_id = cid AND launch_date = date_launch)) THEN
         UPDATE Registers
         SET sid           = new_sid,
             register_date = CURRENT_DATE
         WHERE cust_id = customer_id
           AND course_id = cid
           AND launch_date = date_launch;
+    ELSE
+        RAISE EXCEPTION 'Customer % does not have a registered session for course offering (%, %)', customer_id, cid, date_launch;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -333,7 +340,7 @@ WITH InActiveCust AS (SELECT cust_id, name
                       FROM combine_reg_redeems()
                                NATURAL JOIN Customers
                       GROUP BY cust_id, name
-                      HAVING MAX(register_date) - INTERVAL '6 months' < CURRENT_DATE),
+                      HAVING MAX(register_date) + INTERVAL '6 months' < CURRENT_DATE),
      CustWithNoOfferings AS (SELECT cust_id, name
                              FROM Customers
                              WHERE cust_id NOT IN (SELECT cust_id FROM combine_reg_redeems())),
