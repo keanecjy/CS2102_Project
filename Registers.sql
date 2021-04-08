@@ -85,7 +85,7 @@ $$ LANGUAGE plpgsql;
 -- session_date, start_hour (Sessions)
 -- Instructor_name (Specializes)
 CREATE OR REPLACE FUNCTION get_my_registrations(IN cus_id INT)
-    RETURNS TABLE (course_name TEXT, course_fee FLOAT, session_date DATE, start_hour TIME, duration INT, instructor_name TEXT) AS $$
+    RETURNS TABLE (course_name TEXT, course_fee numeric, session_date DATE, start_hour TIME, duration INT, instructor_name TEXT) AS $$
 DECLARE
 BEGIN
     return query

@@ -9,7 +9,7 @@
 -- This means that the user needs to accurately pass in the correct type of salary_info
 -- (monthly salary for full-time and hourly rate for part-time).
 CREATE OR REPLACE PROCEDURE add_employee(_name text, _address text, _phone int, _email text,
-    _salary_info float, _join_date date, _employee_cat text,
+    _salary_info numeric, _join_date date, _employee_cat text,
     variadic _course_areas text[] default null)
 AS $$
 DECLARE
@@ -120,7 +120,7 @@ $$ LANGUAGE plpgsql;
 -- the part-time instructor taught at all sessions for that particular month and year.
 CREATE OR REPLACE FUNCTION pay_salary()
 RETURNS TABLE(_eid int, _name text, _status text, _num_work_days int, _num_work_hours int,
-    _hourly_rate float, _monthly_salary float, _amount numeric) AS $$
+    _hourly_rate numeric, _monthly_salary numeric, _amount numeric) AS $$
 DECLARE
     curs cursor for (select * from employees order by eid);
     r record;

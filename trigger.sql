@@ -472,7 +472,7 @@ CREATE OR REPLACE FUNCTION after_delete_of_registers()
 $$
 DECLARE
     date_of_session DATE;
-    cost float;
+    cost numeric;
 BEGIN
     SELECT S.session_date INTO date_of_session
     FROM Sessions S
@@ -561,6 +561,7 @@ CREATE CONSTRAINT TRIGGER modify_redeem_check
 AFTER INSERT OR UPDATE OR DELETE ON Redeems DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION modify_redeem_check();
 
+
 CREATE OR REPLACE FUNCTION check_valid_package()
     RETURNS TRIGGER AS
 $$
@@ -583,19 +584,3 @@ $$ language plpgsql;
 CREATE CONSTRAINT TRIGGER check_valid_package
 AFTER INSERT OR UPDATE ON Buys DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION check_valid_package();
-
-
-CREATE OR REPLACE FUNCTION cancel_timing_checks()
-    RETURNS TRIGGER AS
-$$
-BEGIN
-    IF (NEW.cancel_date > now()) THEN
-        RAISE EXCEPTION 'You cant add a Cancel information into the future';
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER cancel_timing_checks
-AFTER INSERT OR UPDATE ON Cancels
-FOR EACH ROW EXECUTE FUNCTION cancel_timing_checks();

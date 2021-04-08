@@ -23,7 +23,7 @@ $$ LANGUAGE sql;
 -- - Use an array to keep track of all the new session_ids added. If one of the sessions fail to find an instructor,
 -- we terminate
 -- */
-CREATE OR REPLACE PROCEDURE add_course_offering(cid int, l_date date, fees float, reg_deadline date,
+CREATE OR REPLACE PROCEDURE add_course_offering(cid int, l_date date, fees numeric, reg_deadline date,
                                                 target_num int, admin_id int, sessions_arr text[][]) AS
 $$
 
@@ -226,7 +226,7 @@ CREATE OR REPLACE FUNCTION get_available_course_offerings()
                 start_date            date,
                 end_date              date,
                 registration_deadline date,
-                fees                  float,
+                fees                  numeric,
                 remaining_seats       bigint
             )
 AS
@@ -316,7 +316,7 @@ CREATE OR REPLACE FUNCTION promote_courses()
                 course_title text,
                 launch_date  date,
                 reg_deadline date,
-                fees         float
+                fees         numeric
             )
 AS
 $$

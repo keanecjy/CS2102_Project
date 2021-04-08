@@ -28,7 +28,7 @@ CREATE TABLE Employees
 CREATE TABLE Part_time_emp
 (
     eid 		int primary key references Employees on delete cascade,
-    hourly_rate float not null,
+    hourly_rate decimal(12,2) not null,
 
     CONSTRAINT non_negative_hourly_rate check (hourly_rate >= 0)
 );
@@ -36,7 +36,7 @@ CREATE TABLE Part_time_emp
 CREATE TABLE Full_time_emp
 (
     eid 			int primary key references Employees on delete cascade,
-    monthly_salary  float not null,
+    monthly_salary  decimal(12,2) not null,
 
     CONSTRAINT non_negative_monthly_salary check (monthly_salary >= 0)
 );
@@ -72,7 +72,7 @@ CREATE TABLE Pay_slips
 (
     eid 			int references Employees on delete cascade,
     payment_date 	date,
-    amount 			numeric not null,
+    amount 			decimal(12,2) not null,
     num_work_days 	int,
     num_work_hours  int,
 
@@ -141,7 +141,7 @@ CREATE TABLE Offerings
 
     target_number_registrations int not null,
     seating_capacity 			int default 0,
-    fees 						float not null,
+    fees 						decimal(12,2) not null,
 
     primary key (launch_date, course_id),
     CONSTRAINT correct_sequential_dates check (
@@ -226,7 +226,7 @@ CREATE TABLE Course_packages
     package_id 				int primary key,
     name 					text not null,
     num_free_registrations 	int not null,
-    price 					float not null,
+    price 					decimal(12,2) not null,
     sale_start_date 		date not null,
     sale_end_date 			date not null,
 
@@ -298,7 +298,7 @@ CREATE TABLE Registers
 CREATE TABLE Cancels
 (
     cancel_date 	timestamp not null,
-    refund_amt      float,
+    refund_amt      decimal(12,2),
     package_credit  int,
 
     cust_id 		int references Customers,

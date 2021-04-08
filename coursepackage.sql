@@ -6,7 +6,7 @@
  * add_course_pacakage(): used to add a new course package
  */ 
 CREATE OR REPLACE PROCEDURE add_course_package(name text, num_sessions int, 
-    start_date date, end_date date, price float)
+    start_date date, end_date date, price numeric)
 AS $$
 DECLARE
     pid int;
@@ -28,7 +28,7 @@ $$ language plpgsql;
  * get_available_course_packages(): used to retrieve course packages that are available for sale
  */
 CREATE OR REPLACE FUNCTION get_available_course_packages()
-RETURNS TABLE (id int, name text, num_free_course_sessions int, end_date date, price float) AS $$
+RETURNS TABLE (id int, name text, num_free_course_sessions int, end_date date, price numeric) AS $$
     select package_id, name, num_free_registrations, sale_end_date, price
     from course_packages
     where current_date between sale_start_date and sale_end_date
@@ -131,7 +131,7 @@ CREATE OR REPLACE FUNCTION top_packages(N int)
 RETURNS TABLE (
     package_id int,
     num_free_sessions int,
-    price float,
+    price numeric,
     start_date date,
     end_date date,
     number_sold bigint

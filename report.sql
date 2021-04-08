@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION view_summary_report(N int)
-RETURNS TABLE (_month text, _year int, _total_salary_paid float,
-    _total_sales_from_packages float, _total_registration_fees float,
-    _total_refunded_registration_fees float, _total_redemption_count int) AS $$
+RETURNS TABLE (_month text, _year int, _total_salary_paid numeric,
+    _total_sales_from_packages numeric, _total_registration_fees numeric,
+    _total_refunded_registration_fees numeric, _total_redemption_count int) AS $$
 DECLARE
     _month_val int;
     _date_ptr date;
@@ -64,7 +64,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION view_manager_report()
 RETURNS TABLE (_manager_name text, _course_areas_total int, _course_offerings_total int,
-    _net_reg_fees_total float, _top_course_title text[]) AS $$
+    _net_reg_fees_total numeric, _top_course_title text[]) AS $$
 DECLARE
     curs cursor for (
         select *
@@ -72,9 +72,6 @@ DECLARE
         where eid in (select eid from Managers)
         order by name);
     r record;
-    _registration_fees float;
-    _refunded_fees float;
-    _redemption_fees float;
 BEGIN
     open curs;
     loop
