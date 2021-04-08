@@ -335,7 +335,7 @@ WITH InActiveCust AS (SELECT cust_id, name
                       FROM combine_reg_redeems()
                                NATURAL JOIN Customers
                       GROUP BY cust_id, name
-                      HAVING MAX(register_date) - INTERVAL '6 months'),
+                      HAVING MAX(register_date) - INTERVAL '6 months' < CURRENT_DATE),
      CustWithNoOfferings AS (SELECT cust_id, name
                              FROM Customers
                              WHERE cust_id NOT IN (SELECT cust_id FROM combine_reg_redeems())),
