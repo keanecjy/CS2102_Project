@@ -110,6 +110,10 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE PROCEDURE remove_employee(_eid int, _depart_date date)
 AS $$
 BEGIN
+    if (_eid not in (select eid from employees)) then
+        raise exception 'Employee % does not exist', _eid;
+    end if;
+
     update Employees
     set depart_date = _depart_date
     where eid = _eid;
@@ -222,10 +226,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION is_departed(emp_id int)
+CREATE OR REPLACE FUNCTION is_departed(emp_id int, query_date date)
 RETURNS boolean AS $$
 BEGIN
-    RETURN coalesce((select depart_date from Employees where emp_id = eid), current_date + 10) < current_date;
+    RETURN coalesce((select depart_date from Employees where emp_id = eid) < query_date, false);
 END;
 $$ LANGUAGE plpgsql;
 

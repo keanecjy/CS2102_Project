@@ -89,8 +89,6 @@ BEGIN
                 LOOP
                     INSERT INTO assignment_table
                     VALUES (s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid, eid_rec.eid);
-
-                    RAISE INFO 'Instructor % for course %, session % %', eid_rec.eid, cid, s_date, s_time;
                 END LOOP;
         END LOOP;
 

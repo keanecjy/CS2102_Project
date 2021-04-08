@@ -146,7 +146,9 @@ BEGIN
     END IF;
 
  
-    IF (TG_OP in ('DELETE', 'UPDATE')) THEN
+    IF (TG_OP in ('DELETE', 'UPDATE') AND
+        EXISTS(SELECT 1 FROM Offerings WHERE (course_id, launch_date) = (OLD.course_id, OLD.launch_date))) THEN
+
         -- find the max and min of the session_date from that particular offering
         SELECT min(session_date), max(session_date) INTO min_date, max_date
         FROM Sessions S
@@ -222,7 +224,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER instructors_overlap_timing_checks
-    AFTER INSERT OR UPDATE ON Sessions
+    AFTER INSERT OR UPDATE ON Sessions DEFERRABLE
     FOR EACH ROW EXECUTE FUNCTION instructors_overlap_timing_checks();
 
 
@@ -241,7 +243,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER instructors_part_time_duration_checks
-    AFTER INSERT OR UPDATE ON Sessions
+    AFTER INSERT OR UPDATE ON Sessions DEFERRABLE
     FOR EACH ROW EXECUTE FUNCTION instructors_part_time_duration_checks();
 
 
@@ -254,15 +256,15 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    IF (is_departed(NEW.eid)) THEN
-        RAISE EXCEPTION 'This instructor have already departed, he cant teach this course anymore';
+    IF (is_departed(NEW.eid, NEW.session_date)) THEN
+        RAISE EXCEPTION 'This instructor will have already departed before this session and cant teach it anymore';
     END IF;
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER instructor_not_departed_checks
-    AFTER INSERT OR UPDATE ON Sessions
+    AFTER INSERT OR UPDATE ON Sessions DEFERRABLE
     FOR EACH ROW EXECUTE FUNCTION instructor_not_departed_checks();
 
 /******************************************
@@ -283,7 +285,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER after_delete_of_sessions
-    AFTER DELETE OR UPDATE ON Sessions
+    AFTER DELETE OR UPDATE ON Sessions DEFERRABLE
     FOR EACH ROW EXECUTE FUNCTION after_delete_of_sessions();
 
 /******************************************
@@ -315,5 +317,5 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER delete_session_checks
-    AFTER DELETE OR UPDATE ON Sessions
+    AFTER DELETE OR UPDATE ON Sessions DEFERRABLE
     FOR EACH ROW EXECUTE FUNCTION delete_session_checks();

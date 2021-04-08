@@ -242,7 +242,7 @@ BEGIN
             select registration_deadline
             from Offerings
             where eid = new.eid) then
-        raise notice 'Departure date for employee id % is not updated as the administrator is handling some course offering where its registration deadline is after the departure date.', new.eid;
+        raise warning 'Departure date for employee id % is not updated as the administrator is handling some course offering where its registration deadline is after the departure date.', new.eid;
         return null;
     -- condition 2
     elsif new.eid in (select eid from Instructors)
@@ -250,12 +250,12 @@ BEGIN
             select session_date
             from Sessions
             where eid = new.eid) then
-       raise notice 'Departure date for employee id % is not updated as the instructor is teaching some course session that starts after the departure date.', new.eid;
+       raise warning 'Departure date for employee id % is not updated as the instructor is teaching some course session that starts after the departure date.', new.eid;
        return null;
     -- condition 3
     elsif new.eid in (select eid from Managers)
         and new.eid in (select eid from Course_areas) then
-        raise notice 'Departure date for employee id % is not updated as the manager is still managing some course area.', new.eid;
+        raise warning 'Departure date for employee id % is not updated as the manager is still managing some course area.', new.eid;
         return null;
     else
         return new;
