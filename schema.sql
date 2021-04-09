@@ -146,13 +146,12 @@ CREATE TABLE Offerings
     primary key (launch_date, course_id),
     CONSTRAINT correct_sequential_dates check (
         launch_date <= registration_deadline and
-        registration_deadline <= start_date and 
+        registration_deadline <= start_date and
         start_date <= end_date
     ),
     CONSTRAINT registration_deadline_10_days_before_start check (
         registration_deadline + interval '10 days' <= start_date
     ),
-    CONSTRAINT seating_capacity_at_least_equal_target_reg check (seating_capacity >= target_number_registrations),
     CONSTRAINT non_negative_target_registrations check (target_number_registrations >= 0),
     CONSTRAINT non_negative_fees check (fees >= 0)
 );
@@ -211,8 +210,7 @@ CREATE TABLE Credit_cards
     from_date 	timestamp not null,
 
     CONSTRAINT unique_card_number_per_customer unique(cust_id, card_number),
-    CONSTRAINT valid_card_number check (
-        (card_number ~ '^\d*$') and (length(card_number) between 8 and 19)),
+    CONSTRAINT valid_card_number check ((card_number ~ '^\d{8,19}$')),
     CONSTRAINT vaild_cvv check (CVV ~ '^\d{3}$')
 );
 

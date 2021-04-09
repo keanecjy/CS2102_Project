@@ -387,8 +387,8 @@ CREATE OR REPLACE FUNCTION update_employee_departure()
     RETURNS TRIGGER AS
 $$
 BEGIN
-    -- If departure date is already null, ignore the constraint check
-    IF (TG_OP = 'UPDATE' AND OLD.depart_date IS NOT NULL) THEN
+    -- If employee already departed, ignore the constraint check
+    IF (TG_OP = 'UPDATE' AND OLD.depart_date <= NEW.depart_date) THEN
         RETURN new;
     END IF;
 
@@ -767,7 +767,6 @@ BEGIN
     SELECT DISTINCT registration_deadline
     INTO course_deadline
     FROM Offerings
-             NATURAL JOIN Courses
     WHERE course_id = NEW.course_id
       AND launch_date = NEW.launch_date;
 
@@ -781,6 +780,7 @@ BEGIN
     FROM Sessions S
     WHERE S.course_id = NEW.course_id
       AND S.launch_date = NEW.launch_date;
+
     IF (NEW.sid <= max_sid) THEN
         RAISE EXCEPTION 'Sid is not in increasing order';
     END IF;
@@ -1102,6 +1102,27 @@ EXECUTE FUNCTION update_offerings_when_session_modified();
 -- TRIGGERS ON OFFERINGS
 
 
+-- To ensure that the constraint of seat_cap >= target_num_reg when adding new course offering
+-- As the seat capacity can fall below target when administrator, constraint check only on trigger
+CREATE OR REPLACE FUNCTION seat_cap_at_least_target_reg()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    -- Check that seating capacity >= target registrations only when adding new offerings
+    IF (NEW.seating_capacity < NEW.target_number_registrations) THEN
+        RAISE EXCEPTION 'The total seating capacity must be at least equal to the target number of registrations';
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER seat_cap_at_least_target_reg
+    AFTER INSERT
+    ON Offerings DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+EXECUTE FUNCTION seat_cap_at_least_target_reg();
+
+
 -- to ensure that course offerings will have >= 1
 CREATE OR REPLACE FUNCTION after_insert_into_offerings()
     RETURNS TRIGGER AS
@@ -1119,6 +1140,48 @@ CREATE CONSTRAINT TRIGGER after_insert_into_offerings
     ON Offerings DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW
 EXECUTE FUNCTION after_insert_into_offerings();
+
+
+-- to ensure that the managers managing a course area has not departed/or is departing
+CREATE OR REPLACE FUNCTION departed_administrator_check()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF (is_departed(NEW.eid, NEW.registration_deadline)) THEN
+        RAISE EXCEPTION 'Administrator % is departing or has departed and cannot administrate the offering for course %', NEW.eid, NEW.course_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER departed_administrator_check
+    AFTER INSERT OR UPDATE
+    ON Offerings DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+EXECUTE FUNCTION departed_administrator_check();
+
+
+-- TRIGGERS ON COURSE AREAS
+
+
+-- to ensure that the managers managing a course area has not departed/or is departing
+CREATE OR REPLACE FUNCTION departed_manager_check()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    -- if manager due to depart, he cannot be allowed to manage any areas
+    IF ((SELECT depart_date FROM employees WHERE eid = NEW.eid) IS NOT NULL) THEN
+        RAISE EXCEPTION 'Manager % is departing or has departed and cannot manage %', NEW.eid, NEW.area_name;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER departed_manager_check
+    AFTER INSERT OR UPDATE
+    ON Course_areas DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+EXECUTE FUNCTION departed_manager_check();
 
 
 /*********************************
@@ -1291,8 +1354,6 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE PROCEDURE update_credit_card(cid int, c_number text, c_expiry date, c_cvv text)
 AS
 $$
-DECLARE
-    rec credit_cards;
 BEGIN
     IF (c_expiry < current_date) THEN
         RAISE EXCEPTION 'New credit card expired: %', c_expiry
@@ -1310,7 +1371,8 @@ BEGIN
         SET from_date   = now(),
             expiry_date = c_expiry,
             CVV         = c_cvv
-        WHERE cust_id = cid AND card_number = c_number;
+        WHERE cust_id = cid
+          AND card_number = c_number;
     ELSE
         INSERT INTO Credit_cards
         VALUES (c_number, c_cvv, c_expiry, cid, now());
@@ -1618,41 +1680,33 @@ CREATE OR REPLACE PROCEDURE add_course_offering(cid int, l_date date, fees numer
                                                 target_num int, admin_id int, sessions_arr text[][]) AS
 $$
 DECLARE
-    assigned_count      int;
-    temp                text[];
-    eid_rec             record;
-    chosen_session      record;
-    one_hour            interval;
-    course_area         text;
-    course_duration     int;
-    earliest_start_date date;
-    latest_end_date     date;
-    seat_capacity       int;
-    next_sid            int;
-    s_date              date;
-    s_time              time;
-    s_rid               int;
+    temp            text[];
+    eid_rec         record;
+    chosen_session  record;
+    one_hour        interval := '1 hour'::interval;
+    course_duration int;
+    next_sid        int;
+    s_date          date;
+    s_time          time;
+    s_rid           int;
 BEGIN
-    one_hour = '1 hour'::interval;
-    assigned_count := ARRAY_LENGTH(sessions_arr, 1);
-
     -- 	Checking validity of course offering information
-    IF (assigned_count = 0 OR reg_deadline < CURRENT_DATE) THEN
+    IF (ARRAY_LENGTH(sessions_arr, 1) = 0 OR reg_deadline < CURRENT_DATE) THEN
         RAISE EXCEPTION 'Course offering details are invalid';
     END IF;
 
-    SELECT area_name, duration
-    INTO course_area, course_duration
+    SELECT duration
+    INTO course_duration
     FROM Courses
     WHERE course_id = cid;
 
-    -- Temp insertion to allow adding of Sessions
-    INSERT INTO Offerings VALUES (l_date, cid, reg_deadline, NULL, NULL, admin_id, 0, 0, fees);
-
-    seat_capacity := 0;
+    IF (EXISTS(SELECT 1 FROM Offerings WHERE (launch_date, course_id) = (l_date, cid))) THEN
+        RAISE EXCEPTION 'Course offering for course % launching on % already exists', cid, l_date;
+    END IF;
 
     CREATE TEMPORARY TABLE IF NOT EXISTS assignment_table
     (
+        sid          int,
         session_date date,
         start_time   time,
         end_time     time,
@@ -1664,6 +1718,7 @@ BEGIN
 
     -- ASSERT (select count(*) from assignment_table) = 0;
 
+    next_sid := 1;
     FOREACH temp SLICE 1 IN ARRAY sessions_arr
         LOOP
             s_date := temp[1]::date;
@@ -1678,11 +1733,26 @@ BEGIN
             FOR eid_rec IN (SELECT * FROM find_instructors(cid, s_date, s_time))
                 LOOP
                     INSERT INTO assignment_table
-                    VALUES (s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid, eid_rec.eid);
+                    VALUES (next_sid, s_date, s_time, s_time + CONCAT(course_duration, ' hours')::interval, s_rid,
+                            eid_rec.eid);
                 END LOOP;
+
+            next_sid := next_sid + 1;
         END LOOP;
 
-    next_sid := 1;
+    CREATE TEMPORARY TABLE IF NOT EXISTS assigned_sessions
+    (
+        sid          int,
+        launch_date  date,
+        cid          int,
+        session_date date,
+        start_time   time,
+        end_time     time,
+        rid          int,
+        eid          int,
+
+        PRIMARY KEY (session_date, start_time, rid, eid)
+    ) ON COMMIT DROP;
 
     -- Assign instructors and add sessions into sessions table
     WHILE EXISTS(SELECT 1 FROM assignment_table)
@@ -1717,14 +1787,10 @@ BEGIN
             LIMIT 1;
 
             -- Add chosen assignment to session
-            INSERT INTO Sessions
-            VALUES (next_sid, l_date, cid,
+            INSERT INTO assigned_sessions
+            VALUES (chosen_session.sid, l_date, cid,
                     chosen_session.session_date, chosen_session.start_time, chosen_session.end_time,
                     chosen_session.rid, chosen_session.eid);
-
-            -- Update information for next iteration
-            next_sid := next_sid + 1;
-            assigned_count := assigned_count - 1;
 
             -- Update assignment table remove clashing slots if
             -- 1. Remove all assignments that assigns to the chosen session
@@ -1746,35 +1812,26 @@ BEGIN
                 WHERE chosen_session.eid = eid
                   AND EXTRACT(MONTH FROM chosen_session.session_date) = EXTRACT(MONTH FROM session_date);
             END IF;
-
-
-            -- Update course offering-related data (start_date, end_date and seat_capacity)
-            IF (earliest_start_date IS NULL OR earliest_start_date > s_date) THEN
-                earliest_start_date := s_date;
-            END IF;
-
-            IF (latest_end_date IS NULL OR latest_end_date < s_date) THEN
-                latest_end_date := s_date;
-            END IF;
-
-            seat_capacity := seat_capacity + (SELECT seating_capacity FROM Rooms WHERE rid = s_rid);
-
-
         END LOOP;
 
-    IF (assigned_count <> 0) THEN
+    IF ((SELECT count(*) FROM assigned_sessions) <> ARRAY_LENGTH(sessions_arr, 1)) THEN
         RAISE EXCEPTION 'No valid instructor assignment found';
     END IF;
 
-    -- Update the course offerings record after all sessions are inserted
-    UPDATE Offerings
-    SET start_date                  = earliest_start_date,
-        end_date                    = latest_end_date,
-        target_number_registrations = target_num,
-        seating_capacity            = seat_capacity
-    WHERE course_id = cid
-      AND launch_date = l_date;
+    -- Add Offerings
+    -- Placeholder session start, end date and seat capacity
+    -- Session trigger will update the dates and seat capacity
+    INSERT INTO Offerings
+    VALUES (l_date, cid, reg_deadline, reg_deadline + 10, reg_deadline + 10, admin_id, target_num, target_num, fees);
 
+    -- Add Sessions
+    INSERT INTO Sessions
+    SELECT *
+    FROM assigned_sessions S
+    ORDER BY S.sid;
+
+    DROP TABLE assignment_table;
+    DROP TABLE assigned_sessions;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -1982,7 +2039,8 @@ BEGIN
         SELECT buy_date, package_id
         INTO date_of_buy, pid
         FROM Buys B
-        WHERE B.cust_id = cus_id AND B.num_remaining_redemptions > 0;
+        WHERE B.cust_id = cus_id
+          AND B.num_remaining_redemptions > 0;
 
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Customer % does not have an active course package that is available for free redemptions', cus_id;
@@ -2027,7 +2085,8 @@ BEGIN
              Q2 AS (SELECT * FROM (Q1 NATURAL JOIN Redeems) A WHERE cust_id = cus_id AND A.session_date > current_date),
              Q3 AS (SELECT *
                     FROM (Q1 NATURAL JOIN Registers) B
-                    WHERE cust_id = cus_id AND B.session_date > current_date)
+                    WHERE cust_id = cus_id
+                      AND B.session_date > current_date)
         SELECT *
         FROM (SELECT Q2.title, Q2.fees, Q2.session_date, Q2.start_time, Q2.duration, Q2.name
               FROM Q2
@@ -2139,7 +2198,9 @@ BEGIN
     SELECT S.session_date, S.start_time, S.eid
     INTO s_date, s_time, prev_eid
     FROM Sessions S
-    WHERE S.sid = in_sid AND S.launch_date = date_of_launch AND S.course_id = in_cid;
+    WHERE S.sid = in_sid
+      AND S.launch_date = date_of_launch
+      AND S.course_id = in_cid;
 
     IF (current_date > s_date OR (current_date = s_date AND current_time > s_time)) THEN
         RAISE EXCEPTION 'This session has already passed';
@@ -2171,7 +2232,9 @@ BEGIN
     IF NOT exists(
             SELECT 1
             FROM Sessions
-            WHERE course_id = _cid AND launch_date = _launch_date AND sid = _session_num) THEN
+            WHERE course_id = _cid
+              AND launch_date = _launch_date
+              AND sid = _session_num) THEN
         RAISE EXCEPTION 'Course session does not exist.';
     END IF;
 
@@ -2179,7 +2242,9 @@ BEGIN
     SELECT session_date, start_time
     INTO _session_date, _session_time
     FROM Sessions
-    WHERE course_id = _cid AND launch_date = _launch_date AND sid = _session_num;
+    WHERE course_id = _cid
+      AND launch_date = _launch_date
+      AND sid = _session_num;
 
     IF _session_date < current_date
         OR (_session_date = current_date AND _session_time <= current_time) THEN
@@ -2200,12 +2265,16 @@ BEGIN
     SELECT count(cust_id)
     INTO _num_of_redeem
     FROM Redeems
-    WHERE course_id = _cid AND launch_date = _launch_date AND sid = _session_num;
+    WHERE course_id = _cid
+      AND launch_date = _launch_date
+      AND sid = _session_num;
 
     SELECT count(cust_id)
     INTO _num_of_register
     FROM Registers
-    WHERE course_id = _cid AND launch_date = _launch_date AND sid = _session_num;
+    WHERE course_id = _cid
+      AND launch_date = _launch_date
+      AND sid = _session_num;
 
     IF _new_room_capacity < (_num_of_redeem + _num_of_register) THEN
         RAISE EXCEPTION 'The number of registrations exceeds the seating capacity of the new room.';
@@ -2214,7 +2283,9 @@ BEGIN
     -- update room for the session
     UPDATE Sessions
     SET rid = _new_rid
-    WHERE course_id = _cid AND launch_date = _launch_date AND sid = _session_num;
+    WHERE course_id = _cid
+      AND launch_date = _launch_date
+      AND sid = _session_num;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -2669,8 +2740,8 @@ $$
 DECLARE
     curs CURSOR FOR (
         SELECT *
-        FROM Employees
-        WHERE eid IN (SELECT eid FROM Managers)
+        FROM Employees NATURAL JOIN Managers
+        WHERE NOT is_departed(eid, date_trunc('year', current_date)::date)
         ORDER BY name);
     r record;
 BEGIN

@@ -1,5 +1,5 @@
 /**********************************************
- * Personnels & Organisation-related
+ * Personnel & Organisation-related
  *********************************************/
 
 INSERT INTO Employees (eid, name, phone, email, address, join_date, depart_date) VALUES
@@ -20,7 +20,7 @@ INSERT INTO Employees (eid, name, phone, email, address, join_date, depart_date)
 (15, 'Brose Scollard', '82476370', 'bscollarde@archive.org', '29008 Dwight Court', '2020-9-13', null),
 (16, 'Faunie Goacher', '93562662', 'fgoacherf@mozilla.com', '42 Nobel Court', '2020-12-9', null),
 (17, 'Pamella MacAskie', '86706014', 'pmacaskieg@tripod.com', '6 Merrick Road', '2020-6-17', null),
-(18, 'Caspar Singyard', '93343021', 'csingyardh@kickstarter.com', '4936 Judy Street', '2020-7-15', null),
+(18, 'Caspar Singyard', '93343021', 'csingyardh@kickstarter.com', '4936 Judy Street', '2020-7-15', '2020-10-10'),
 (19, 'Zelig Scorer', '99231978', 'zscoreri@cmu.edu', '8656 Stone Corner Trail', '2021-1-1', null),
 (20, 'Lotta Terne', '99553768', 'lternej@columbia.edu', '00 Shasta Trail', '2021-1-1', null),
 (21, 'Kelbee Ludwell', '65008733', 'kludwellk@macromedia.com', '90 Graedel Lane', '2021-1-27', null),
@@ -463,7 +463,6 @@ INSERT INTO Cancels (cancel_date, refund_amt, package_credit, cust_id, sid, laun
 ('2021-3-17', 75.50 * 0.9, NULL, 18, 1, '2021-2-13', 7),
 ('2020-12-27', 0, NULL, 23, 1, '2020-11-16', 14),
 ('2021-4-18', 181.40 * 0.9, NULL, 37, 4, '2021-4-1', 5),
-
 ('2021-4-5', NULL, 1, 8, 4, '2021-4-1', 1),
 ('2021-2-9', NULL, 0, 5, 1, '2020-12-13', 15),
 ('2021-1-11', NULL, 0, 4, 1, '2021-1-8', 9),
