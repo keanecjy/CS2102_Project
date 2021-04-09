@@ -2606,14 +2606,14 @@ BEGIN
         _year := extract(YEAR FROM _date_ptr);
 
         -- Get total salary paid
-        SELECT coalesce(sum(amount), 0)
+        SELECT round(coalesce(sum(amount), 0), 2)
         INTO _total_salary_paid
         FROM Pay_slips
         WHERE extract(MONTH FROM payment_date) = _month_val
           AND extract(YEAR FROM payment_date) = _year;
 
         -- Get total sales from course packages
-        SELECT coalesce(sum(price), 0)
+        SELECT round(coalesce(sum(price), 0), 2)
         INTO _total_sales_from_packages
         FROM Buys
                  NATURAL JOIN Course_packages
@@ -2621,7 +2621,7 @@ BEGIN
           AND extract(YEAR FROM buy_date) = _year;
 
         -- Get total registration fees paid using credit card
-        SELECT coalesce(sum(fees), 0)
+        SELECT round(coalesce(sum(fees), 0), 2)
         INTO _total_registration_fees
         FROM Registers
                  NATURAL JOIN Offerings
@@ -2629,7 +2629,7 @@ BEGIN
           AND extract(YEAR FROM register_date) = _year;
 
         -- Get total amount of registration_fees refunded
-        SELECT coalesce(sum(refund_amt), 0)
+        SELECT round(coalesce(sum(refund_amt), 0), 2)
         INTO _total_refunded_registration_fees
         FROM Cancels
         WHERE extract(MONTH FROM cancel_date) = _month_val
@@ -2734,7 +2734,7 @@ BEGIN
                  NATURAL FULL JOIN Manager_offerings_packages P;
 
 
-        SELECT coalesce(sum(_net_reg_fees), 0)
+        SELECT round(coalesce(sum(_net_reg_fees), 0), 2)
         INTO _net_reg_fees_total
         FROM Manager_offerings_net_reg_fees;
 
