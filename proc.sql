@@ -692,7 +692,7 @@ DECLARE
     num_packages    int;
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        -- udpate redemption count
+        -- update redemption count
         UPDATE Buys B
         SET num_remaining_redemptions = num_remaining_redemptions - 1
         WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
@@ -1479,7 +1479,7 @@ $$ LANGUAGE plpgsql;
 -- R1 DENOTES {start_date, ..., end_date} each increment in per day
 -- R2 Checks through the part_time_instructors and select those whose total hours + duration <= 30 and and the day which
 -- Iterate though should only contain mon-fri and check if there is any availability for that day itself
--- R3 checks through the full time instructors and select those whos days are available.
+-- R3 checks through the full time instructors and select those whose days are available.
 CREATE OR REPLACE FUNCTION get_available_instructors(IN in_cid INT, IN in_start_date date, IN in_end_date date)
     RETURNS TABLE
             (
