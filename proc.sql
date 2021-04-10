@@ -1721,13 +1721,13 @@ BEGIN
     next_sid := 1;
     FOREACH temp SLICE 1 IN ARRAY sessions_arr
         LOOP
-            s_date := temp[1]::date;
-            s_time := temp[2]::time;
-            s_rid := temp[3]::int;
-
             IF (ARRAY_LENGTH(temp, 1) <> 3) THEN
                 RAISE EXCEPTION 'Please provide the session date, start time and room identifier for each session';
             END IF;
+
+            s_date := temp[1]::date;
+            s_time := temp[2]::time;
+            s_rid := temp[3]::int;
 
             -- Add all possible session assignments into assignment table
             FOR eid_rec IN (SELECT * FROM find_instructors(cid, s_date, s_time))

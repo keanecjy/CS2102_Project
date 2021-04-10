@@ -286,7 +286,7 @@ Q19
 CREATE OR REPLACE PROCEDURE update_course_session(customer_id int, cid int, date_launch date, new_sid int) AS
 $$
 BEGIN
-    IF (NOT EXISTS(SELECT 1 FROM Customers where cust_id = customer_id)) THEN
+    IF (NOT EXISTS(SELECT 1 FROM Customers WHERE cust_id = customer_id)) THEN
         RAISE EXCEPTION 'Customer % does not exist', customer_id;
     END IF;
 
