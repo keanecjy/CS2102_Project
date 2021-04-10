@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION is_departed(emp_id int, query_date date)
     RETURNS boolean AS
 $$
 BEGIN
-    RETURN coalesce((SELECT depart_date FROM Employees WHERE emp_id = eid) < query_date, FALSE);
+    RETURN COALESCE((SELECT depart_date FROM Employees WHERE emp_id = eid) < query_date, FALSE);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -40,7 +40,7 @@ $$
 DECLARE
     active_card Credit_cards;
 BEGIN
-    IF NOT exists(SELECT 1 FROM Customers WHERE cust_id = cid) THEN
+    IF NOT EXISTS(SELECT 1 FROM Customers WHERE cust_id = cid) THEN
         RAISE EXCEPTION 'Non-existent customer id %', cid;
         RETURN NULL;
     END IF;
@@ -58,7 +58,7 @@ BEGIN
             USING HINT = 'Please add a new credit card';
 
         RETURN NULL;
-    ELSIF (active_card.expiry_date < current_date) THEN
+    ELSIF (active_card.expiry_date < CURRENT_DATE) THEN
         RAISE EXCEPTION 'Credit card for customer % expired', cid;
 
         RETURN NULL;
@@ -93,8 +93,8 @@ DECLARE
     _start_time   TIME     := TIME '09:00';
     _end_time     TIME     := TIME '18:00';
     arr           Time[]   := ARRAY []::Time[];
-    one_hour      interval := concat(1, ' hours')::interval;
-    span_interval interval := concat(span, ' hours')::interval;
+    one_hour      interval := CONCAT(1, ' hours')::interval;
+    span_interval interval := CONCAT(span, ' hours')::interval;
 BEGIN
     -- IF THIS GUY HAVE SOMETHING ON THIS DAY, THEN WE ITERATE, ELSE, WE CAN ADD ALL THE DAYS POSSIBLE
     IF (EXISTS(SELECT 1 FROM Sessions S WHERE S.eid = in_eid AND S.session_date = curr_date)) THEN
@@ -107,7 +107,7 @@ BEGIN
                                      AND S.session_date = curr_date
                                      AND (_start_time, _start_time + span_interval) OVERLAPS
                                          (S.start_time - one_hour, S.end_time + one_hour))) THEN
-                    arr := array_append(arr, _start_time);
+                    arr := ARRAY_APPEND(arr, _start_time);
                 END IF;
                 _start_time := _start_time + one_hour;
             END LOOP;
@@ -115,7 +115,7 @@ BEGIN
         WHILE (_start_time + span_interval <= _end_time)
             LOOP
                 IF (NOT (_start_time, _start_time + span_interval) OVERLAPS (twelve_pm, two_pm)) THEN
-                    arr = array_append(arr, _start_time);
+                    arr = ARRAY_APPEND(arr, _start_time);
                 END IF;
                 _start_time := _start_time + one_hour;
             END LOOP;
@@ -519,7 +519,7 @@ BEGIN
                   WHERE R.buy_date = B.buy_date
                     AND R.cust_id = B.cust_id
                     AND R.package_id = B.package_id
-                    AND current_date + 7 <= S.session_date));
+                    AND CURRENT_DATE + 7 <= S.session_date));
 
     IF (num_packages > 1) THEN
         RAISE EXCEPTION 'Customer % can only have at most one active or partially active package', NEW.cust_id;
@@ -664,11 +664,11 @@ BEGIN
       AND S.course_id = OLD.course_id
       AND S.launch_date = OLD.launch_date;
 
-    IF (current_date + 7 <= date_of_session) THEN
+    IF (CURRENT_DATE + 7 <= date_of_session) THEN
         SELECT fees INTO cost FROM Offerings WHERE course_id = OLD.course_id AND launch_date = OLD.launch_date;
-        INSERT INTO Cancels VALUES (now(), 0.9 * cost, NULL, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+        INSERT INTO Cancels VALUES (NOW(), 0.9 * cost, NULL, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
     ELSE
-        INSERT INTO Cancels VALUES (now(), 0, NULL, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+        INSERT INTO Cancels VALUES (NOW(), 0, NULL, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
     END IF;
     RETURN NULL;
 END;
@@ -715,7 +715,7 @@ BEGIN
                       WHERE R.buy_date = B.buy_date
                         AND R.cust_id = B.cust_id
                         AND R.package_id = B.package_id
-                        AND current_date + 7 <= S.session_date));
+                        AND CURRENT_DATE + 7 <= S.session_date));
 
         IF (num_packages > 1) THEN
             RAISE EXCEPTION 'Updating the course session will result in multiple active/partially active package for Customer %', NEW.cust_id
@@ -731,14 +731,14 @@ BEGIN
         WHERE (sid, course_id, launch_date) = (OLD.sid, OLD.course_id, OLD.launch_date);
 
         -- handle the cancellation of session
-        IF (current_date + 7 <= date_of_session) THEN
+        IF (CURRENT_DATE + 7 <= date_of_session) THEN
             UPDATE Buys B
             SET num_remaining_redemptions = num_remaining_redemptions + 1
             WHERE (B.buy_date, B.cust_id, B.package_id) = (NEW.buy_date, NEW.cust_id, NEW.package_id);
 
-            INSERT INTO Cancels VALUES (now(), NULL, 1, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+            INSERT INTO Cancels VALUES (NOW(), NULL, 1, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
         ELSE
-            INSERT INTO Cancels VALUES (now(), NULL, 0, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
+            INSERT INTO Cancels VALUES (NOW(), NULL, 0, OLD.cust_id, OLD.sid, OLD.launch_date, OLD.course_id);
         END IF;
 
     END IF;
@@ -770,7 +770,7 @@ BEGIN
     WHERE course_id = NEW.course_id
       AND launch_date = NEW.launch_date;
 
-    IF (current_date > course_deadline) THEN
+    IF (CURRENT_DATE > course_deadline) THEN
         RAISE EXCEPTION 'Course registration deadline have already PASSED!';
     END IF;
 
@@ -809,7 +809,7 @@ DECLARE
     span         INTERVAL;
 BEGIN
 
-    SELECT DISTINCT concat(duration, ' hours')::interval
+    SELECT DISTINCT CONCAT(duration, ' hours')::interval
     INTO span
     FROM Courses
     WHERE course_id = NEW.course_id;
@@ -871,7 +871,7 @@ CREATE OR REPLACE FUNCTION room_availability_checks()
 $$
 BEGIN
     -- VALIDATE THE ROOM AVAILABILITY
-    IF (1 < (SELECT count(*)
+    IF (1 < (SELECT COUNT(*)
              FROM Sessions S
              WHERE S.session_date = NEW.session_date
                AND S.rid = NEW.rid
@@ -901,7 +901,7 @@ DECLARE
 BEGIN
     -- VALIDATE INSTRUCTOR TEACH AT MOST ONE COURSE SESSION AT ANY HOUR WITH AT LEAST ONE HOUR BREAK IN BETWEEN SESSIONS
     IF (1 < (
-        SELECT count(*)
+        SELECT COUNT(*)
         FROM Sessions S
         WHERE S.session_date = NEW.session_date
           AND S.eid = NEW.eid
@@ -1016,7 +1016,7 @@ BEGIN
 
     -- checks if the course session have already started
 
-    IF (OLD.session_date < current_date OR (OLD.session_date = current_date AND OLD.start_time < current_time)) THEN
+    IF (OLD.session_date < CURRENT_DATE OR (OLD.session_date = CURRENT_DATE AND OLD.start_time < CURRENT_TIME)) THEN
         RAISE EXCEPTION 'Course session has already started';
     END IF;
 
@@ -1043,7 +1043,7 @@ BEGIN
 
     IF (TG_OP IN ('INSERT', 'UPDATE')) THEN
         -- find the max and min of the session_date from that particular offering
-        SELECT min(session_date), max(session_date)
+        SELECT MIN(session_date), MAX(session_date)
         INTO min_date, max_date
         FROM Sessions S
         WHERE S.course_id = NEW.course_id
@@ -1068,7 +1068,7 @@ BEGIN
         EXISTS(SELECT 1 FROM Offerings WHERE (course_id, launch_date) = (OLD.course_id, OLD.launch_date))) THEN
 
         -- find the max and min of the session_date from that particular offering
-        SELECT min(session_date), max(session_date)
+        SELECT MIN(session_date), MAX(session_date)
         INTO min_date, max_date
         FROM Sessions S
         WHERE S.course_id = OLD.course_id
@@ -1238,7 +1238,7 @@ BEGIN
     END IF;
 
     -- generate id
-    SELECT coalesce(max(eid), 0) + 1
+    SELECT COALESCE(MAX(eid), 0) + 1
     INTO _eid
     FROM Employees;
 
@@ -1327,13 +1327,13 @@ $$
 DECLARE
     cid int;
 BEGIN
-    IF (expiry_date < current_date) THEN
+    IF (expiry_date < CURRENT_DATE) THEN
         RAISE EXCEPTION 'Credit card expired: %', expiry_date
             USING HINT = 'Please check your expiry date';
     END IF;
 
     -- generate id
-    SELECT coalesce(max(cust_id), 0) + 1
+    SELECT COALESCE(MAX(cust_id), 0) + 1
     INTO cid
     FROM customers;
 
@@ -1342,7 +1342,7 @@ BEGIN
     VALUES (cid, name, address, phone, email);
 
     INSERT INTO Credit_cards
-    VALUES (card_number, CVV, expiry_date, cid, now());
+    VALUES (card_number, CVV, expiry_date, cid, NOW());
 END
 $$ LANGUAGE plpgsql;
 
@@ -1355,27 +1355,27 @@ CREATE OR REPLACE PROCEDURE update_credit_card(cid int, c_number text, c_expiry 
 AS
 $$
 BEGIN
-    IF (c_expiry < current_date) THEN
+    IF (c_expiry < CURRENT_DATE) THEN
         RAISE EXCEPTION 'New credit card expired: %', c_expiry
             USING HINT = 'Please check your expiry date';
 
-    ELSIF (NOT exists(SELECT 1 FROM Customers WHERE cust_id = cid)) THEN
+    ELSIF (NOT EXISTS(SELECT 1 FROM Customers WHERE cust_id = cid)) THEN
         RAISE EXCEPTION 'Non-existent customer id: %', cid
             USING HINT = 'Please check customer ID or use add_customer to add';
 
     END IF;
 
-    IF (exists(SELECT 1 FROM credit_cards WHERE cust_id = cid AND card_number = c_number)) THEN
+    IF (EXISTS(SELECT 1 FROM credit_cards WHERE cust_id = cid AND card_number = c_number)) THEN
 
         UPDATE Credit_cards
-        SET from_date   = now(),
+        SET from_date   = NOW(),
             expiry_date = c_expiry,
             CVV         = c_cvv
         WHERE cust_id = cid
           AND card_number = c_number;
     ELSE
         INSERT INTO Credit_cards
-        VALUES (c_number, c_cvv, c_expiry, cid, now());
+        VALUES (c_number, c_cvv, c_expiry, cid, NOW());
     END IF;
 END
 $$ LANGUAGE plpgsql;
@@ -1403,7 +1403,7 @@ $$
 DECLARE
     span          INT;
     end_hour      time;
-    one_hour      interval := concat(1, ' hours')::interval;
+    one_hour      interval := CONCAT(1, ' hours')::interval;
     span_interval interval;
 BEGIN
     IF (in_cid NOT IN (SELECT course_id FROM Courses)) THEN
@@ -1421,7 +1421,7 @@ BEGIN
     END IF;
 
     SELECT duration INTO span FROM Courses WHERE Courses.course_id = in_cid;
-    span_interval := concat(span, ' hours')::interval;
+    span_interval := CONCAT(span, ' hours')::interval;
     -- validate session_date + duration
     IF ((in_start_hour, in_start_hour + span_interval) OVERLAPS (TIME '12:00', TIME '14:00') OR
         (in_start_hour + span_interval > TIME '18:00')) THEN
@@ -1494,7 +1494,7 @@ $$
 DECLARE
     span int;
 BEGIN
-    IF NOT exists(SELECT 1 FROM Courses WHERE course_id = in_cid) THEN
+    IF NOT EXISTS(SELECT 1 FROM Courses WHERE course_id = in_cid) THEN
         RAISE EXCEPTION 'Course % does not exist', in_cid;
     END IF;
 
@@ -1506,7 +1506,7 @@ BEGIN
                         NATURAL JOIN Specializes
                         NATURAL JOIN (SELECT E.eid, E.depart_date, E.name FROM Employees E) AS TEMP2) AS Q0
         ),
-             R1 AS (SELECT CAST(s_day AS date) FROM generate_series(in_start_date, in_end_date, '1 day') AS S(s_day)),
+             R1 AS (SELECT CAST(s_day AS date) FROM GENERATE_SERIES(in_start_date, in_end_date, '1 day') AS S(s_day)),
              R2 AS (SELECT DISTINCT Q2.eid,
                                     Q2.name,
                                     (SELECT get_hours(Q2.eid, Q2.s_day)),
@@ -1516,7 +1516,7 @@ BEGIN
                     WHERE NOT is_departed(Q2.eid, Q2.s_day)
                       AND (SELECT get_hours(Q2.eid, Q2.s_day)) + span <= 30
                       AND (SELECT EXTRACT(DOW FROM Q2.s_day) IN (1, 2, 3, 4, 5))
-                      AND (array_length(check_availability(Q2.eid, span, Q2.s_day), 1)) <> 0
+                      AND (ARRAY_LENGTH(check_availability(Q2.eid, span, Q2.s_day), 1)) <> 0
              ),
              R3 AS (SELECT DISTINCT Q3.eid,
                                     Q3.name,
@@ -1526,7 +1526,7 @@ BEGIN
                     FROM (R0 NATURAL JOIN Full_time_instructors CROSS JOIN R1) AS Q3
                     WHERE NOT is_departed(Q3.eid, Q3.s_day)
                       AND (SELECT EXTRACT(DOW FROM Q3.s_day) IN (1, 2, 3, 4, 5))
-                      AND (array_length(check_availability(Q3.eid, span, Q3.s_day), 1)) <> 0
+                      AND (ARRAY_LENGTH(check_availability(Q3.eid, span, Q3.s_day), 1)) <> 0
              )
         SELECT *
         FROM R2
@@ -1558,13 +1558,13 @@ DECLARE
     _session_end_time   time;
 BEGIN
     -- validate session_date
-    IF (SELECT extract(ISODOW FROM _session_date) IN (6, 7)) THEN
+    IF (SELECT EXTRACT(ISODOW FROM _session_date) IN (6, 7)) THEN
         RAISE EXCEPTION 'Session date must be a weekday.';
     END IF;
 
     -- validate session_start_time and session_end_time
     _session_start_time := _session_start_hour;
-    _session_end_time := _session_start_hour + concat(_session_duration, ' hours')::interval;
+    _session_end_time := _session_start_hour + CONCAT(_session_duration, ' hours')::interval;
     IF (NOT (_session_start_time, _session_end_time) OVERLAPS (time '09:00', time '18:00'))
         OR (_session_start_time, _session_end_time) OVERLAPS (time '12:00', time '14:00') THEN
         RAISE EXCEPTION 'Session start time and/or duration is/are invalid.';
@@ -1576,7 +1576,7 @@ BEGIN
         EXIT WHEN NOT found;
 
         -- assume start_time and end_time are in units of hour
-        IF NOT exists(
+        IF NOT EXISTS(
                 SELECT 1
                 FROM Sessions
                 WHERE rid = r.rid
@@ -1634,7 +1634,7 @@ BEGIN
         LOOP
             EXIT WHEN _loop_date > _end_date;
 
-            IF (SELECT extract(ISODOW FROM _loop_date) IN (1, 2, 3, 4, 5)) THEN
+            IF (SELECT EXTRACT(ISODOW FROM _loop_date) IN (1, 2, 3, 4, 5)) THEN
                 _rid = r.rid;
                 _room_capacity := r.seating_capacity;
                 _day := _loop_date;
@@ -1646,17 +1646,17 @@ BEGIN
                         _temp_start_hour := _hour;
                         _temp_end_hour := _hour + INTERVAL '1 hour';
 
-                        IF NOT exists(
+                        IF NOT EXISTS(
                                 SELECT 1
                                 FROM Sessions
                                 WHERE rid = _rid
                                   AND session_date = _loop_date
                                   AND (start_time, end_time) OVERLAPS (_temp_start_hour, _temp_end_hour)) THEN
-                            _available_hours := array_append(_available_hours, _hour);
+                            _available_hours := ARRAY_APPEND(_available_hours, _hour);
                         END IF;
                     END LOOP;
 
-                IF (array_length(_available_hours, 1) > 0) THEN
+                IF (ARRAY_LENGTH(_available_hours, 1) > 0) THEN
                     RETURN NEXT;
                 END IF;
             END IF;
@@ -1814,7 +1814,7 @@ BEGIN
             END IF;
         END LOOP;
 
-    IF ((SELECT count(*) FROM assigned_sessions) <> ARRAY_LENGTH(sessions_arr, 1)) THEN
+    IF ((SELECT COUNT(*) FROM assigned_sessions) <> ARRAY_LENGTH(sessions_arr, 1)) THEN
         RAISE EXCEPTION 'No valid instructor assignment found';
     END IF;
 
@@ -1845,7 +1845,7 @@ DECLARE
     pid int;
 BEGIN
     -- generate id
-    SELECT coalesce(max(package_id), 0) + 1
+    SELECT COALESCE(MAX(package_id), 0) + 1
     INTO pid
     FROM course_packages;
 
@@ -1870,7 +1870,7 @@ AS
 $$
 SELECT name, num_free_registrations, sale_end_date, price
 FROM course_packages
-WHERE current_date BETWEEN sale_start_date AND sale_end_date
+WHERE CURRENT_DATE BETWEEN sale_start_date AND sale_end_date
 ORDER BY sale_end_date ASC;
 $$ LANGUAGE sql;
 
@@ -1898,7 +1898,7 @@ BEGIN
 
     -- buying course package
     INSERT INTO Buys
-    VALUES (current_date, cid, active_card.card_number, pid, n_redemptions);
+    VALUES (CURRENT_DATE, cid, active_card.card_number, pid, n_redemptions);
 END
 $$ LANGUAGE plpgsql;
 
@@ -1919,20 +1919,20 @@ BEGIN
     FROM Buys B
     WHERE cust_id = cid
       AND (num_remaining_redemptions > 0 OR
-           exists(SELECT 1
+           EXISTS(SELECT 1
                   FROM Redeems R
                            NATURAL JOIN Sessions S
                   WHERE R.cust_id = cid
                     AND R.buy_date = B.buy_date
                     AND R.package_id = B.package_id
-                    AND current_date + 7 <= S.session_date));
+                    AND CURRENT_DATE + 7 <= S.session_date));
 
     IF NOT found THEN
         RAISE INFO 'No active/partially active course package for customer %', cid;
         RETURN out_json;
     END IF;
 
-    SELECT array_to_json(array_agg(t))
+    SELECT ARRAY_TO_JSON(ARRAY_AGG(t))
     INTO redeemed_sessions
     FROM (
              SELECT title AS course_name, session_date, start_time AS session_start_time
@@ -1947,7 +1947,7 @@ BEGIN
          ) t;
 
 
-    SELECT row_to_json(p)
+    SELECT ROW_TO_JSON(p)
     INTO out_json
     FROM (
              SELECT C.name                                   AS package_name,
@@ -2046,12 +2046,12 @@ BEGIN
             RAISE EXCEPTION 'Customer % does not have an active course package that is available for free redemptions', cus_id;
         END IF;
 
-        INSERT INTO Redeems VALUES (current_date, date_of_buy, cus_id, pid, session_number, date_of_launch, in_cid);
+        INSERT INTO Redeems VALUES (CURRENT_DATE, date_of_buy, cus_id, pid, session_number, date_of_launch, in_cid);
 
     ELSIF (pay_method = 'card') THEN
         SELECT card_number INTO num_card FROM get_active_card(cus_id);
 
-        INSERT INTO Registers VALUES (current_date, cus_id, num_card, session_number, date_of_launch, in_cid);
+        INSERT INTO Registers VALUES (CURRENT_DATE, cus_id, num_card, session_number, date_of_launch, in_cid);
     ELSE
         RAISE EXCEPTION 'INVALID PAYMENT METHOD';
     END IF;
@@ -2082,11 +2082,11 @@ BEGIN
                              NATURAL JOIN Courses
                              NATURAL JOIN Q0
                              NATURAL JOIN Sessions)),
-             Q2 AS (SELECT * FROM (Q1 NATURAL JOIN Redeems) A WHERE cust_id = cus_id AND A.session_date > current_date),
+             Q2 AS (SELECT * FROM (Q1 NATURAL JOIN Redeems) A WHERE cust_id = cus_id AND A.session_date > CURRENT_DATE),
              Q3 AS (SELECT *
                     FROM (Q1 NATURAL JOIN Registers) B
                     WHERE cust_id = cus_id
-                      AND B.session_date > current_date)
+                      AND B.session_date > CURRENT_DATE)
         SELECT *
         FROM (SELECT Q2.title, Q2.fees, Q2.session_date, Q2.start_time, Q2.duration, Q2.name
               FROM Q2
@@ -2202,7 +2202,7 @@ BEGIN
       AND S.launch_date = date_of_launch
       AND S.course_id = in_cid;
 
-    IF (current_date > s_date OR (current_date = s_date AND current_time > s_time)) THEN
+    IF (CURRENT_DATE > s_date OR (CURRENT_DATE = s_date AND CURRENT_TIME > s_time)) THEN
         RAISE EXCEPTION 'This session has already passed';
     END IF;
 
@@ -2229,7 +2229,7 @@ DECLARE
     _num_of_register   int;
 BEGIN
     -- check if session exists
-    IF NOT exists(
+    IF NOT EXISTS(
             SELECT 1
             FROM Sessions
             WHERE course_id = _cid
@@ -2246,8 +2246,8 @@ BEGIN
       AND launch_date = _launch_date
       AND sid = _session_num;
 
-    IF _session_date < current_date
-        OR (_session_date = current_date AND _session_time <= current_time) THEN
+    IF _session_date < CURRENT_DATE
+        OR (_session_date = CURRENT_DATE AND _session_time <= CURRENT_TIME) THEN
         RAISE EXCEPTION 'Room is not updated as the session has already started.';
     END IF;
 
@@ -2262,14 +2262,14 @@ BEGIN
     FROM Rooms
     WHERE rid = _new_rid;
 
-    SELECT count(cust_id)
+    SELECT COUNT(cust_id)
     INTO _num_of_redeem
     FROM Redeems
     WHERE course_id = _cid
       AND launch_date = _launch_date
       AND sid = _session_num;
 
-    SELECT count(cust_id)
+    SELECT COUNT(cust_id)
     INTO _num_of_register
     FROM Registers
     WHERE course_id = _cid
@@ -2327,7 +2327,7 @@ $$
 DECLARE
     span interval;
 BEGIN
-    SELECT DISTINCT concat(duration, ' hours')::interval
+    SELECT DISTINCT CONCAT(duration, ' hours')::interval
     INTO span
     FROM Courses
     WHERE course_id = in_cid;
@@ -2371,8 +2371,8 @@ DECLARE
     _last_work_day  int;
     _pay_date       date;
 BEGIN
-    _pay_month := extract(MONTH FROM current_date)::int;
-    _pay_year := extract(YEAR FROM current_date)::int;
+    _pay_month := EXTRACT(MONTH FROM CURRENT_DATE)::int;
+    _pay_year := EXTRACT(YEAR FROM CURRENT_DATE)::int;
 
     OPEN curs;
     LOOP
@@ -2382,19 +2382,19 @@ BEGIN
         _eid := r.eid;
         _name := r.name;
 
-        IF _eid NOT IN (SELECT eid FROM Employees WHERE depart_date < make_date(_pay_year, _pay_month, 1)) THEN
+        IF _eid NOT IN (SELECT eid FROM Employees WHERE depart_date < MAKE_DATE(_pay_year, _pay_month, 1)) THEN
             IF _eid IN (SELECT eid FROM Part_time_emp) THEN
                 _status := 'Part-time';
                 _num_work_days := NULL;
 
                 -- compute number of hours worked by the part-time instructor
                 -- assume start_time and end_time are in units of hour
-                SELECT coalesce(sum(extract(HOUR FROM end_time) - extract(HOUR FROM start_time))::int, 0)
+                SELECT COALESCE(SUM(EXTRACT(HOUR FROM end_time) - EXTRACT(HOUR FROM start_time))::int, 0)
                 INTO _num_work_hours
                 FROM Sessions
                 WHERE eid = _eid
-                  AND _pay_month = (extract(MONTH FROM session_date))::int
-                  AND _pay_year = (extract(YEAR FROM session_date))::int;
+                  AND _pay_month = (EXTRACT(MONTH FROM session_date))::int
+                  AND _pay_year = (EXTRACT(YEAR FROM session_date))::int;
 
                 SELECT hourly_rate
                 INTO _hourly_rate
@@ -2403,13 +2403,13 @@ BEGIN
 
                 _monthly_salary := NULL;
                 _amount := (_num_work_hours * _hourly_rate)::numeric;
-                _amount := round(_amount, 2);
+                _amount := ROUND(_amount, 2);
 
             ELSE -- full-time employee
                 _status := 'Full-time';
 
                 -- compute number of days in a month
-                SELECT (extract(DAYS FROM date_trunc('month', make_date(_pay_year, _pay_month, 1))
+                SELECT (EXTRACT(DAYS FROM DATE_TRUNC('month', MAKE_DATE(_pay_year, _pay_month, 1))
                     + INTERVAL '1 month - 1 day'))::int
                 INTO _num_of_days;
 
@@ -2419,16 +2419,16 @@ BEGIN
                 FROM Employees
                 WHERE eid = _eid;
 
-                IF _pay_month = (extract(MONTH FROM _join_date))::int
-                    AND _pay_year = (extract(YEAR FROM _join_date))::int THEN
-                    _first_work_day := (extract(DAY FROM _join_date))::int;
+                IF _pay_month = (EXTRACT(MONTH FROM _join_date))::int
+                    AND _pay_year = (EXTRACT(YEAR FROM _join_date))::int THEN
+                    _first_work_day := (EXTRACT(DAY FROM _join_date))::int;
                 ELSE
                     _first_work_day := 1;
                 END IF;
 
-                IF _pay_month = (extract(MONTH FROM _depart_date))::int
-                    AND _pay_year = (extract(YEAR FROM _depart_date))::int THEN
-                    _last_work_day := (extract(DAY FROM _depart_date))::int;
+                IF _pay_month = (EXTRACT(MONTH FROM _depart_date))::int
+                    AND _pay_year = (EXTRACT(YEAR FROM _depart_date))::int THEN
+                    _last_work_day := (EXTRACT(DAY FROM _depart_date))::int;
                 ELSE
                     _last_work_day := _num_of_days;
                 END IF;
@@ -2443,14 +2443,14 @@ BEGIN
                 WHERE eid = _eid;
 
                 _amount := (_num_work_days::numeric / _num_of_days * _monthly_salary)::numeric;
-                _amount := round(_amount, 2);
+                _amount := ROUND(_amount, 2);
 
             END IF;
 
             -- add to output & table if
             IF (_amount <> 0) THEN
                 RETURN NEXT;
-                _pay_date := make_date(_pay_year, _pay_month, _num_of_days);
+                _pay_date := MAKE_DATE(_pay_year, _pay_month, _num_of_days);
 
                 -- insert salary payment record
                 INSERT INTO Pay_slips
@@ -2564,13 +2564,13 @@ BEGIN
     -- get current year
     SELECT date_part
     INTO current_year
-    FROM date_part('year', current_date);
+    FROM DATE_PART('year', CURRENT_DATE);
 
     CREATE TEMPORARY TABLE IF NOT EXISTS temp_table ON COMMIT DROP AS
-    SELECT P.*, coalesce(count(buy_date), 0) AS number_sold
+    SELECT P.*, COALESCE(COUNT(buy_date), 0) AS number_sold
     FROM Course_packages P
              NATURAL LEFT JOIN Buys B
-    WHERE date_part('year', sale_start_date) = current_year
+    WHERE DATE_PART('year', sale_start_date) = current_year
     GROUP BY P.package_id;
 
     OPEN curs FOR (
@@ -2667,51 +2667,51 @@ BEGIN
         RAISE EXCEPTION 'Input to view summary report cannot be negative, provided value: %', N;
     END IF;
 
-    _date_ptr := current_date;
+    _date_ptr := CURRENT_DATE;
 
     LOOP
         EXIT WHEN N = 0;
 
-        _month_val := extract(MONTH FROM _date_ptr);
-        _month := to_char(_date_ptr, 'Mon');
-        _year := extract(YEAR FROM _date_ptr);
+        _month_val := EXTRACT(MONTH FROM _date_ptr);
+        _month := TO_CHAR(_date_ptr, 'Mon');
+        _year := EXTRACT(YEAR FROM _date_ptr);
 
         -- Get total salary paid
-        SELECT round(coalesce(sum(amount), 0), 2)
+        SELECT ROUND(COALESCE(SUM(amount), 0), 2)
         INTO _total_salary_paid
         FROM Pay_slips
-        WHERE extract(MONTH FROM payment_date) = _month_val
-          AND extract(YEAR FROM payment_date) = _year;
+        WHERE EXTRACT(MONTH FROM payment_date) = _month_val
+          AND EXTRACT(YEAR FROM payment_date) = _year;
 
         -- Get total sales from course packages
-        SELECT round(coalesce(sum(price), 0), 2)
+        SELECT ROUND(COALESCE(SUM(price), 0), 2)
         INTO _total_sales_from_packages
         FROM Buys
                  NATURAL JOIN Course_packages
-        WHERE extract(MONTH FROM buy_date) = _month_val
-          AND extract(YEAR FROM buy_date) = _year;
+        WHERE EXTRACT(MONTH FROM buy_date) = _month_val
+          AND EXTRACT(YEAR FROM buy_date) = _year;
 
         -- Get total registration fees paid using credit card
-        SELECT round(coalesce(sum(fees), 0), 2)
+        SELECT ROUND(COALESCE(SUM(fees), 0), 2)
         INTO _total_registration_fees
         FROM Registers
                  NATURAL JOIN Offerings
-        WHERE extract(MONTH FROM register_date) = _month_val
-          AND extract(YEAR FROM register_date) = _year;
+        WHERE EXTRACT(MONTH FROM register_date) = _month_val
+          AND EXTRACT(YEAR FROM register_date) = _year;
 
         -- Get total amount of registration_fees refunded
-        SELECT round(coalesce(sum(refund_amt), 0), 2)
+        SELECT ROUND(COALESCE(SUM(refund_amt), 0), 2)
         INTO _total_refunded_registration_fees
         FROM Cancels
-        WHERE extract(MONTH FROM cancel_date) = _month_val
-          AND extract(YEAR FROM cancel_date) = _year;
+        WHERE EXTRACT(MONTH FROM cancel_date) = _month_val
+          AND EXTRACT(YEAR FROM cancel_date) = _year;
 
         -- Get total amount of redemptions
-        SELECT coalesce(count(*), 0)
+        SELECT COALESCE(COUNT(*), 0)
         INTO _total_redemption_count
         FROM Redeems
-        WHERE extract(MONTH FROM redeem_date) = _month_val
-          AND extract(YEAR FROM redeem_date) = _year;
+        WHERE EXTRACT(MONTH FROM redeem_date) = _month_val
+          AND EXTRACT(YEAR FROM redeem_date) = _year;
 
         -- iterate to previous month
         _date_ptr := _date_ptr - INTERVAL '1 month';
@@ -2740,8 +2740,9 @@ $$
 DECLARE
     curs CURSOR FOR (
         SELECT *
-        FROM Employees NATURAL JOIN Managers
-        WHERE NOT is_departed(eid, date_trunc('year', current_date)::date)
+        FROM Employees
+                 NATURAL JOIN Managers
+        WHERE NOT is_departed(eid, DATE_TRUNC('year', CURRENT_DATE)::date)
         ORDER BY name);
     r record;
 BEGIN
@@ -2752,7 +2753,7 @@ BEGIN
 
         _manager_name := r.name;
 
-        SELECT count(area_name)
+        SELECT COUNT(area_name)
         INTO _course_areas_total
         FROM Course_areas
         WHERE eid = r.eid;
@@ -2761,7 +2762,7 @@ BEGIN
         CREATE TEMP TABLE Manager_offerings_this_year AS
         SELECT *
         FROM Offerings
-        WHERE (SELECT extract(YEAR FROM end_date)) = (SELECT extract(YEAR FROM current_date))
+        WHERE (SELECT EXTRACT(YEAR FROM end_date)) = (SELECT EXTRACT(YEAR FROM CURRENT_DATE))
           AND course_id IN (
             SELECT course_id
             FROM Courses
@@ -2770,14 +2771,14 @@ BEGIN
                 FROM Course_areas
                 WHERE eid = r.eid));
 
-        SELECT count(launch_date)
+        SELECT COUNT(launch_date)
         INTO _course_offerings_total
         FROM Manager_offerings_this_year;
 
         -- Table to store total registration fees for each offering
         -- managed by the manager and end this year
         CREATE TEMP TABLE Manager_offerings_registers AS
-        SELECT launch_date, course_id, coalesce(sum(O.fees), 0) AS _offering_registration_fees
+        SELECT launch_date, course_id, COALESCE(SUM(O.fees), 0) AS _offering_registration_fees
         FROM Manager_offerings_this_year O
                  NATURAL JOIN Registers R
         GROUP BY launch_date, course_id;
@@ -2791,7 +2792,7 @@ BEGIN
                      NATURAL JOIN Redeems)
         SELECT launch_date,
                course_id,
-               coalesce(sum(P.price / P.num_free_registrations), 0) AS _offering_redemption_fees
+               COALESCE(SUM(P.price / P.num_free_registrations), 0) AS _offering_redemption_fees
         FROM Manager_offerings_redeems R
                  NATURAL JOIN Course_packages P
         GROUP BY launch_date, course_id;
@@ -2800,12 +2801,12 @@ BEGIN
         CREATE TEMP TABLE Manager_offerings_net_reg_fees AS
         SELECT launch_date,
                course_id,
-               coalesce(Reg._offering_registration_fees, 0) + coalesce(P._offering_redemption_fees, 0) AS _net_reg_fees
+               COALESCE(Reg._offering_registration_fees, 0) + COALESCE(P._offering_redemption_fees, 0) AS _net_reg_fees
         FROM Manager_offerings_registers Reg
                  NATURAL FULL JOIN Manager_offerings_packages P;
 
 
-        SELECT round(coalesce(sum(_net_reg_fees), 0), 2)
+        SELECT ROUND(COALESCE(SUM(_net_reg_fees), 0), 2)
         INTO _net_reg_fees_total
         FROM Manager_offerings_net_reg_fees;
 
@@ -2815,7 +2816,7 @@ BEGIN
                 WHERE course_id IN (
                     SELECT course_id
                     FROM Manager_offerings_net_reg_fees
-                    WHERE _net_reg_fees IN (SELECT max(_net_reg_fees) FROM Manager_offerings_net_reg_fees)));
+                    WHERE _net_reg_fees IN (SELECT MAX(_net_reg_fees) FROM Manager_offerings_net_reg_fees)));
 
         RETURN NEXT;
 
