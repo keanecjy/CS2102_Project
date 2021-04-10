@@ -1509,7 +1509,7 @@ BEGIN
              R1 AS (SELECT CAST(s_day AS date) FROM GENERATE_SERIES(in_start_date, in_end_date, '1 day') AS S(s_day)),
              R2 AS (SELECT DISTINCT Q2.eid,
                                     Q2.name,
-                                    (SELECT get_hours(Q2.eid, Q2.s_day)),
+                                    (SELECT get_hours(Q2.eid, current_date)),
                                     Q2.s_day,
                                     (SELECT check_availability(Q2.eid, span, Q2.s_day))
                     FROM (R0 NATURAL JOIN Part_time_instructors CROSS JOIN R1) AS Q2
@@ -1520,7 +1520,7 @@ BEGIN
              ),
              R3 AS (SELECT DISTINCT Q3.eid,
                                     Q3.name,
-                                    (SELECT get_hours(Q3.eid, Q3.s_day)),
+                                    (SELECT get_hours(Q3.eid, current_date)),
                                     Q3.s_day,
                                     (SELECT check_availability(Q3.eid, span, Q3.s_day))
                     FROM (R0 NATURAL JOIN Full_time_instructors CROSS JOIN R1) AS Q3
